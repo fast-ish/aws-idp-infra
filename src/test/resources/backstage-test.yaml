@@ -1,0 +1,93 @@
+# Test configuration for Backstage deployment
+common:
+  id: test-backstage-id
+  organization: test-org
+  account: "123456789012"
+  region: us-west-2
+  name: backstage-test
+  alias: test
+  environment: development
+  version: v1
+  domain: test.example.com
+  tags:
+    "test.example.com:billing": test-org
+    "test.example.com:managed-by": test-org
+
+vpc:
+  name: test-backstage-vpc
+  cidr: 10.0.0.0/16
+  ipProtocol: ipv4_only
+  natGateways: 1
+  createInternetGateway: true
+  availabilityZones:
+    - us-west-2a
+    - us-west-2b
+  enableDnsSupport: true
+  enableDnsHostnames: true
+  defaultInstanceTenancy: default
+  securityGroups: []
+  subnets:
+    - name: public
+      cidrMask: 24
+      reserved: false
+      subnetType: public
+      mapPublicIpOnLaunch: false
+      tags: {}
+    - name: private
+      cidrMask: 24
+      reserved: false
+      subnetType: private_with_egress
+      tags: {}
+  tags: {}
+
+database:
+  version: "16.4"
+  name: test-backstage-db
+  databaseName: backstage
+  storageType: aurora_iopt1
+  enableDataApi: true
+  deletionProtection: false
+  removalPolicy: destroy
+  credentials:
+    name: test-backstage-db-credentials
+    description: Test Backstage PostgreSQL credentials
+    username: backstage_admin
+    password:
+      length: 32
+      excludeNumbers: false
+      excludeLowercase: false
+      excludeUppercase: false
+      includeSpace: false
+    removalPolicy: destroy
+    tags: {}
+  writer:
+    name: backstage-writer
+    allowMajorVersionUpgrade: false
+    autoMinorVersionUpgrade: true
+    publiclyAccessible: false
+    performanceInsights:
+      enabled: true
+      retention: default
+  readers: []
+  tags: {}
+
+githubOAuth:
+  name: test-backstage-github-oauth
+  description: Test GitHub OAuth credentials
+  username: github_oauth
+  password:
+    length: 64
+    excludeNumbers: false
+    excludeLowercase: false
+    excludeUppercase: false
+    includeSpace: false
+  removalPolicy: destroy
+  tags: {}
+
+helm:
+  name: backstage
+  namespace: backstage
+  release: backstage-test
+  repository: ""
+  values: backstage/values.mustache
+  version: "1.0.0"

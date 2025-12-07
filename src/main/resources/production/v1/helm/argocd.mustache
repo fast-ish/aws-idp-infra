@@ -1,0 +1,199 @@
+global:
+  domain: argocd.{{domain}}
+  logging:
+    format: json
+    level: info
+
+configs:
+  params:
+    server.insecure: true
+
+  cm:
+    url: https://argocd.{{domain}}
+    exec.enabled: "true"
+    admin.enabled: "false"
+    timeout.reconciliation: 180s
+    resource.exclusions: |
+      - apiGroups:
+          - cilium.io
+        kinds:
+          - CiliumIdentity
+        clusters:
+          - "*"
+
+  rbac:
+    policy.default: role:readonly
+    policy.csv: |
+      p, role:admin, applications, *, */*, allow
+      p, role:admin, clusters, get, *, allow
+      p, role:admin, repositories, *, *, allow
+      p, role:admin, logs, get, *, allow
+      p, role:admin, exec, create, */*, allow
+      g, admin, role:admin
+
+controller:
+  replicas: 2
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+server:
+  replicas: 2
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  ingress:
+    enabled: true
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/certificate-arn: "{{certificate.arn}}"
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+      alb.ingress.kubernetes.io/healthcheck-path: /healthz
+      alb.ingress.kubernetes.io/success-codes: 200-399
+      alb.ingress.kubernetes.io/group.name: argo
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+repoServer:
+  replicas: 2
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+  serviceAccount:
+    create: true
+    name: argocd-repo-server
+    annotations:
+      eks.amazonaws.com/role-arn: "{{repoServer.role.arn}}"
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+applicationSet:
+  replicas: 2
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+notifications:
+  enabled: true
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+  notifiers:
+    service.slack: |
+      token: $slack-token
+
+  subscriptions:
+    - recipients:
+        - slack:platform-deployments
+      triggers:
+        - on-sync-succeeded
+        - on-sync-failed
+        - on-health-degraded
+
+  templates:
+    template.app-sync-succeeded: |
+      message: |
+        Application {{.app.metadata.name}} sync succeeded.
+        Revision: {{.app.status.sync.revision}}
+
+    template.app-sync-failed: |
+      message: |
+        Application {{.app.metadata.name}} sync failed.
+        Error: {{.app.status.operationState.message}}
+
+    template.app-health-degraded: |
+      message: |
+        Application {{.app.metadata.name}} health degraded.
+        Status: {{.app.status.health.status}}
+
+  triggers:
+    trigger.on-sync-succeeded: |
+      - when: app.status.operationState.phase in ['Succeeded']
+        send: [app-sync-succeeded]
+
+    trigger.on-sync-failed: |
+      - when: app.status.operationState.phase in ['Failed', 'Error']
+        send: [app-sync-failed]
+
+    trigger.on-health-degraded: |
+      - when: app.status.health.status == 'Degraded'
+        send: [app-health-degraded]
+
+dex:
+  enabled: false
+
+redis:
+  enabled: true
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+redis-ha:
+  enabled: false

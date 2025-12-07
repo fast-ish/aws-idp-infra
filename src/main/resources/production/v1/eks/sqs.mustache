@@ -1,0 +1,37 @@
+name: {{deployment:id}}-karpenter
+retention: 300
+customPolicies:
+  - name: {{deployment:id}}-karpenter-notify
+    policy: policy/karpenter-notify.mustache
+    mappings:
+      resources:
+        - arn:aws:sqs:{{deployment:region}}:{{deployment:account}}:{{deployment:id}}-karpenter
+rules:
+  - name: {{deployment:id}}-eks-health
+    enabled: true
+    eventPattern:
+      source: [ "aws.health" ]
+      detailType: [ "AWS Health Event" ]
+  - name: {{deployment:id}}-eks-spot
+    enabled: true
+    eventPattern:
+      source: [ "aws.ec2" ]
+      detailType: [ "EC2 Spot Instance Interruption Warning" ]
+  - name: {{deployment:id}}-eks-rebalance
+    enabled: true
+    eventPattern:
+      source: [ "aws.ec2" ]
+      detailType: [ "EC2 Instance Rebalance Recommendation" ]
+  - name: {{deployment:id}}-eks-state
+    enabled: true
+    eventPattern:
+      source: [ "aws.ec2" ]
+      detailType: [ "EC2 Instance State-change Notification" ]
+tags:
+  "{{deployment:domain}}:resource-type": sqs
+  "{{deployment:domain}}:category": eks
+  "{{deployment:domain}}:type": operations
+  "{{deployment:domain}}:component": {{deployment:id}}-eks
+  "{{deployment:domain}}:organization": "{{deployment:organization}}"
+  "{{deployment:domain}}:name": "{{deployment:team:name}}"
+  "{{deployment:domain}}:alias": "{{deployment:team:alias}}"

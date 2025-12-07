@@ -1,0 +1,26 @@
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dependency-review:
+    name: review dependency changes
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: checkout code
+      uses: actions/checkout@v6
+
+    - name: dependency review
+      uses: actions/dependency-review-action@v4
+      with:
+        fail-on-severity: moderate
+        comment-summary-in-pr: always
+        license-check: true
+        allow-licenses: MIT, Apache-2.0, BSD-3-Clause, ISC, BSD-2-Clause

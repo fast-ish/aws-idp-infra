@@ -1,0 +1,21 @@
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: {{ include "backstage.fullname" . }}-nodepool
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  template:
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: {{ include "backstage.fullname" . }}-nodeclass
+      requirements:
+        {{- toYaml .Values.node.requirements | nindent 8 }}
+  limits:
+    cpu: {{ .Values.node.limits.cpu }}
+    memory: {{ .Values.node.limits.memory }}
+  disruption:
+    consolidateAfter: {{ .Values.node.disruption.consolidateAfter }}
+    consolidationPolicy: {{ .Values.node.disruption.consolidationPolicy }}

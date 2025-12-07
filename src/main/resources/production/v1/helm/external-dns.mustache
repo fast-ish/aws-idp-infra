@@ -1,0 +1,28 @@
+provider: aws
+
+aws:
+  region: {{deployment:region}}
+
+txtOwnerId: {{txtOwnerId}}
+domainFilters:
+{{#domainFilters}}
+  - {{.}}
+{{/domainFilters}}
+
+policy: sync
+
+serviceAccount:
+  create: false
+  name: external-dns
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

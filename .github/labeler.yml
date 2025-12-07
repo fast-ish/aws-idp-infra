@@ -1,0 +1,33 @@
+# Label PRs based on file paths
+
+java:
+  - changed-files:
+    - any-glob-to-any-file: 'src/**/*.java'
+
+infrastructure:
+  - changed-files:
+    - any-glob-to-any-file: 'src/main/resources/**/*.mustache'
+
+helm:
+  - changed-files:
+    - any-glob-to-any-file: 'helm/**/*'
+
+ci:
+  - changed-files:
+    - any-glob-to-any-file: '.github/**/*'
+
+config:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'pom.xml'
+      - 'cdk.json'
+      - 'checkstyle.xml'
+      - 'renovate.json'
+
+documentation:
+  - changed-files:
+    - any-glob-to-any-file: '**/*.md'
+
+tests:
+  - changed-files:
+    - any-glob-to-any-file: 'src/test/**/*'

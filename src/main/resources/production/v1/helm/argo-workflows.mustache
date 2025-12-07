@@ -1,0 +1,116 @@
+server:
+  replicas: 2
+  serviceAccount:
+    create: true
+    name: argo-server
+    annotations:
+      eks.amazonaws.com/role-arn: "{{argoServer.role.arn}}"
+
+  extraArgs:
+    - --auth-mode=server
+    - --secure=false
+
+  ingress:
+    enabled: true
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/certificate-arn: "{{certificate.arn}}"
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+      alb.ingress.kubernetes.io/healthcheck-path: /
+      alb.ingress.kubernetes.io/success-codes: 200-399
+      alb.ingress.kubernetes.io/group.name: argo
+    hosts:
+      - workflows.{{domain}}
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+controller:
+  replicas: 2
+  serviceAccount:
+    create: true
+    name: argo-workflow-controller
+    annotations:
+      eks.amazonaws.com/role-arn: "{{argoController.role.arn}}"
+
+  workflowNamespaces:
+    - argo
+    - default
+
+  workflowDefaults:
+    spec:
+      serviceAccountName: argo-workflow
+      ttlStrategy:
+        secondsAfterCompletion: 3600
+        secondsAfterSuccess: 1800
+        secondsAfterFailure: 86400
+      podGC:
+        strategy: OnWorkflowSuccess
+        deleteDelayDuration: 5m
+
+  persistence:
+    archive: false
+
+  metricsConfig:
+    enabled: true
+    port: 9090
+    path: /metrics
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  extraArgs:
+    - --leader-elect
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+artifactRepository:
+  archiveLogs: true
+  s3:
+    bucket: "{{artifactBucket}}"
+    region: "{{region}}"
+    endpoint: s3.{{region}}.amazonaws.com
+    useSDKCreds: true
+    insecure: false
+    keyFormat: "artifacts/{{`{{workflow.namespace}}`}}/{{`{{workflow.name}}`}}/{{`{{pod.name}}`}}"
+
+workflow:
+  serviceAccount:
+    create: true
+    name: argo-workflow
+    annotations:
+      eks.amazonaws.com/role-arn: "{{workflowExecutor.role.arn}}"
+  rbac:
+    create: true
+
+executor:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 256Mi
+
+useStaticCredentials: false
+singleNamespace: false
+createAggregateRoles: true

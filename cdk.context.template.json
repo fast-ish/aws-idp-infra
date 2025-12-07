@@ -1,0 +1,43 @@
+{
+  "platform:id": "xyz",
+  "platform:organization": "myorg",
+  "platform:account": "000000000000",
+  "platform:region": "us-west-2",
+  "platform:name": "backstage",
+  "platform:alias": "idp",
+  "platform:environment": "production",
+  "platform:version": "v1",
+  "platform:domain": "example.com",
+
+  "deployment:id": "backstage",
+  "deployment:organization": "platform",
+  "deployment:account": "000000000000",
+  "deployment:region": "us-west-2",
+  "deployment:team:name": "platform",
+  "deployment:team:alias": "backstage",
+  "deployment:environment": "production",
+  "deployment:version": "v1",
+  "deployment:domain": "backstage.example.com",
+
+  "deployment:eks:grafana:secret": "myorg-grafana",
+
+  "deployment:eks:administrators": [
+    {
+      "username": "admin",
+      "role": "arn:aws:iam::000000000000:role/AWSReservedSSO_AdministratorAccess_abc",
+      "email": "admin@example.com"
+    }
+  ],
+  "deployment:eks:users": [],
+  "deployment:tags": [],
+  "availability-zones:account=000000000000:region=us-west-2": [
+    "us-west-2a",
+    "us-west-2b",
+    "us-west-2c",
+    "us-west-2d"
+  ],
+  "acknowledged-issue-numbers": [
+    32775,
+    34892
+  ]
+}
