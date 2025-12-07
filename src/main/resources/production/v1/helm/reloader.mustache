@@ -1,0 +1,17 @@
+reloader:
+  watchGlobally: true
+  reloadOnCreate: false
+  syncAfterRestart: false
+  reloadStrategy: default  # default | annotations | env-vars
+  ignoreSecrets: false
+  ignoreConfigMaps: false
+  deployment:
+    nodeSelector:
+      "eks.amazonaws.com/nodegroup": {{deployment:id}}-core-node
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi

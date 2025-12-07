@@ -1,0 +1,164 @@
+name: EKS Addon Updates
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+env:
+  JAVA_VERSION: '21'
+  JAVA_DISTRIBUTION: 'corretto'
+
+jobs:
+  check-addon-updates:
+    name: Check EKS Addon Updates
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-west-2
+
+    - name: Check for addon updates
+      id: check-updates
+      run: |
+        echo "## EKS Addon Version Check" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Get latest EKS version
+        EKS_VERSION="1.31"
+
+        echo "### Checking addon versions for EKS $EKS_VERSION" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        ADDONS=("vpc-cni" "coredns" "kube-proxy" "aws-ebs-csi-driver" "eks-pod-identity-agent")
+
+        echo "| Addon | Latest Version | Default Version |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|----------------|-----------------|" >> $GITHUB_STEP_SUMMARY
+
+        UPDATES_AVAILABLE=false
+
+        for addon in "${ADDONS[@]}"; do
+          # Get addon versions
+          VERSIONS=$(aws eks describe-addon-versions \
+            --addon-name "$addon" \
+            --kubernetes-version "$EKS_VERSION" \
+            --query 'addons[0].addonVersions[*].addonVersion' \
+            --output text 2>/dev/null || echo "N/A")
+
+          if [ "$VERSIONS" != "N/A" ]; then
+            LATEST=$(echo "$VERSIONS" | tr '\t' '\n' | head -1)
+            DEFAULT=$(aws eks describe-addon-versions \
+              --addon-name "$addon" \
+              --kubernetes-version "$EKS_VERSION" \
+              --query 'addons[0].addonVersions[?compatibilities[0].defaultVersion==`true`].addonVersion' \
+              --output text 2>/dev/null || echo "N/A")
+
+            echo "| $addon | $LATEST | $DEFAULT |" >> $GITHUB_STEP_SUMMARY
+
+            # Check if current version in mustache differs
+            if [ -f "src/main/resources/production/v1/eks/addons.mustache" ]; then
+              CURRENT=$(grep -A1 "name: $addon" src/main/resources/production/v1/eks/addons.mustache | grep "version:" | awk '{print $2}' || echo "")
+              if [ -n "$CURRENT" ] && [ "$CURRENT" != "$LATEST" ]; then
+                UPDATES_AVAILABLE=true
+              fi
+            fi
+          else
+            echo "| $addon | N/A | N/A |" >> $GITHUB_STEP_SUMMARY
+          fi
+        done
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if [ "$UPDATES_AVAILABLE" = true ]; then
+          echo "updates_available=true" >> $GITHUB_OUTPUT
+          echo "**Updates are available!** Consider updating addon versions." >> $GITHUB_STEP_SUMMARY
+        else
+          echo "updates_available=false" >> $GITHUB_OUTPUT
+          echo "All addons are up to date." >> $GITHUB_STEP_SUMMARY
+        fi
+
+  check-helm-updates:
+    name: Check Helm Chart Updates
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Helm
+      uses: azure/setup-helm@v4
+
+    - name: Check Helm chart versions
+      run: |
+        echo "## Helm Chart Version Check" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Add common repos
+        helm repo add jetstack https://charts.jetstack.io 2>/dev/null || true
+        helm repo add aws-secrets-manager https://aws.github.io/secrets-store-csi-driver-provider-aws 2>/dev/null || true
+        helm repo add eks https://aws.github.io/eks-charts 2>/dev/null || true
+        helm repo add karpenter https://charts.karpenter.sh 2>/dev/null || true
+        helm repo add grafana https://grafana.github.io/helm-charts 2>/dev/null || true
+        helm repo update
+
+        echo "| Chart | Repository | Latest Version |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|------------|----------------|" >> $GITHUB_STEP_SUMMARY
+
+        # Check specific charts
+        CHARTS=(
+          "jetstack/cert-manager"
+          "aws-secrets-manager/secrets-store-csi-driver-provider-aws"
+          "eks/aws-load-balancer-controller"
+          "karpenter/karpenter"
+          "grafana/alloy"
+          "grafana/k8s-monitoring"
+        )
+
+        for chart in "${CHARTS[@]}"; do
+          LATEST=$(helm search repo "$chart" --output json | jq -r '.[0].version // "N/A"' 2>/dev/null || echo "N/A")
+          echo "| $chart | $(echo $chart | cut -d'/' -f1) | $LATEST |" >> $GITHUB_STEP_SUMMARY
+        done
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Run \`helm search repo <chart-name>\` locally for more details." >> $GITHUB_STEP_SUMMARY
+
+  check-kubernetes-version:
+    name: Check Kubernetes Version
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-west-2
+
+    - name: Check available EKS versions
+      run: |
+        echo "## Available EKS Kubernetes Versions" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # List available versions
+        VERSIONS=$(aws eks describe-addon-versions \
+          --addon-name vpc-cni \
+          --query 'addons[0].addonVersions[*].compatibilities[*].clusterVersion' \
+          --output text 2>/dev/null | tr '\t' '\n' | sort -u -V | tail -5)
+
+        echo "### Latest 5 supported EKS versions:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        for version in $VERSIONS; do
+          echo "- $version" >> $GITHUB_STEP_SUMMARY
+        done
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "See [EKS Version Calendar](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html) for deprecation dates." >> $GITHUB_STEP_SUMMARY

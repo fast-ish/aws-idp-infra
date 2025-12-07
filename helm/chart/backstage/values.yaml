@@ -1,0 +1,90 @@
+platformId: ""
+deploymentId: ""
+account: ""
+region: ""
+environment: production
+name: backstage
+alias: ""
+build: v1
+domain: ""
+organization: ""
+
+image:
+  repository: ghcr.io/backstage/backstage
+  tag: latest
+  pullPolicy: Always
+
+replicas: 1
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+
+labels: {}
+annotations: {}
+
+securityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+  runAsGroup: 1000
+
+database:
+  host: ""
+  port: "5432"
+  name: backstage
+  secretName: ""
+
+auth:
+  github:
+    enabled: true
+    secretName: ""
+
+ingress:
+  enabled: true
+  className: alb
+  annotations: {}
+  hosts: []
+
+node:
+  selector: {}
+  limits:
+    cpu: 50
+    memory: 100Gi
+  disruption:
+    consolidateAfter: 10m
+    consolidationPolicy: WhenEmpty
+  requirements: []
+
+serviceAccount:
+  create: true
+  annotations: {}
+
+env: []
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

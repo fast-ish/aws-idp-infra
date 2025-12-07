@@ -1,0 +1,19 @@
+apiVersion: v2
+name: backstage
+version: 1.0.0
+appVersion: 1.0.0
+description: Backstage developer portal - internal developer platform
+home: https://backstage.io/
+icon: https://backstage.io/logo_assets/svg/Icon_Teal.svg
+sources:
+  - https://github.com/fast-ish/aws-backstage-infra
+keywords:
+  - developer-portal
+  - backstage
+  - platform
+  - catalog
+  - scaffolder
+  - techdocs
+maintainers:
+  - name: fastish
+    email: platform@fasti.sh

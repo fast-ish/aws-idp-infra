@@ -1,0 +1,27 @@
+nodeSelector:
+  "eks.amazonaws.com/nodegroup": {{deployment:id}}-core-node
+
+clusterName: {{deployment:id}}-eks
+
+replicaCount: 2
+
+serviceAccount:
+  create: false
+  name: {{deployment:id}}-aws-load-balancer-sa
+
+enableServiceMutatorWebhook: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceMonitor:
+  enabled: false

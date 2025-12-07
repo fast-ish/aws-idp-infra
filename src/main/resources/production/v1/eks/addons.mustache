@@ -1,0 +1,626 @@
+managed:
+  # https://docs.aws.amazon.com/eks/latest/userguide/eks-add-ons.html#workloads-add-ons-available-eks
+  awsVpcCni:
+    name: vpc-cni
+    version: v1.20.5-eksbuild.1
+    preserveOnDelete: false
+    resolveConflicts: overwrite
+    serviceAccount:
+      metadata:
+        name: aws-node
+        namespace: kube-system
+        labels:
+          "{{deployment:domain}}/resource-type": service-account
+          "{{deployment:domain}}/category": network
+          "{{deployment:domain}}/type": operations
+          "{{deployment:domain}}/component": aws-vpc-cni.aws-node
+          "{{deployment:domain}}/organization": "{{deployment:organization}}"
+          "{{deployment:domain}}/name": "{{deployment:team:name}}"
+          "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+        annotations: { }
+      role:
+        name: {{deployment:id}}-vpc-cni
+        managedPolicyNames:
+          - AmazonEKS_CNI_Policy
+        customPolicies: [ ]
+        tags:
+          "{{deployment:domain}}:resource-type": role
+          "{{deployment:domain}}:category": network
+          "{{deployment:domain}}:type": operations
+          "{{deployment:domain}}:component": {{deployment:id}}-aws-vpc-cni.aws-node
+          "{{deployment:domain}}:organization": "{{deployment:organization}}"
+          "{{deployment:domain}}:name": "{{deployment:team:name}}"
+          "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+  awsEbsCsi:
+    name: aws-ebs-csi-driver
+    version: v1.53.0-eksbuild.1
+    preserveOnDelete: false
+    resolveConflicts: overwrite
+    serviceAccount:
+      metadata:
+        name: ebs-csi-controller-sa
+        namespace: kube-system
+        labels:
+          "{{deployment:domain}}/resource-type": service-account
+          "{{deployment:domain}}/category": storage
+          "{{deployment:domain}}/type": operations
+          "{{deployment:domain}}/component": aws-ebs-cni
+          "{{deployment:domain}}/organization": "{{deployment:organization}}"
+          "{{deployment:domain}}/name": "{{deployment:team:name}}"
+          "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+        annotations: { }
+      role:
+        name: {{deployment:id}}-aws-ebs-csi-sa
+        managedPolicyNames:
+          - service-role/AmazonEBSCSIDriverPolicy
+        customPolicies:
+          - name: {{deployment:id}}-eks-ebs-encryption
+            policy: policy/kms-eks-ebs-encryption.mustache
+            mappings:
+              account: {{deployment:account}}
+              alias: alias/{{deployment:id}}-eks-ebs-encryption
+        tags:
+          "{{deployment:domain}}:resource-type": role
+          "{{deployment:domain}}:category": storage
+          "{{deployment:domain}}:type": operations
+          "{{deployment:domain}}:component": {{deployment:id}}-aws-ebs-cni
+          "{{deployment:domain}}:organization": "{{deployment:organization}}"
+          "{{deployment:domain}}:name": "{{deployment:team:name}}"
+          "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+    defaultStorageClass: eks/storage-class.yaml
+    kms:
+      alias: {{deployment:id}}-eks-ebs-encryption
+      description: "eks ebs csi volume encryption"
+      enabled: true
+      enableKeyRotation: false
+      keyUsage: encrypt_decrypt
+      keySpec: symmetric_default
+      removalPolicy: destroy
+  kubeProxy:
+    name: kube-proxy
+    version: v1.34.1-eksbuild.2
+    preserveOnDelete: false
+    resolveConflicts: overwrite
+  coreDns:
+    name: coredns
+    version: v1.12.4-eksbuild.1
+    preserveOnDelete: false
+    resolveConflicts: overwrite
+  podIdentityAgent:
+    name: eks-pod-identity-agent
+    version: v1.3.10-eksbuild.1
+    preserveOnDelete: false
+    resolveConflicts: overwrite
+  containerInsights:
+    name: amazon-cloudwatch-observability
+    version: v5.0.0-eksbuild.1
+    preserveOnDelete: false
+    resolveConflicts: overwrite
+    serviceAccount:
+      metadata:
+        name: cloudwatch-agent
+        namespace: amazon-cloudwatch
+        labels:
+          "{{deployment:domain}}/resource-type": service-account
+          "{{deployment:domain}}/category": monitoring
+          "{{deployment:domain}}/type": operations
+          "{{deployment:domain}}/component": amazon-cloudwatch-observability
+          "{{deployment:domain}}/organization": "{{deployment:organization}}"
+          "{{deployment:domain}}/name": "{{deployment:team:name}}"
+          "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+        annotations: { }
+      role:
+        name: {{deployment:id}}-cloudwatch-agent-sa
+        managedPolicyNames:
+          - CloudWatchAgentServerPolicy
+          - AWSXrayWriteOnlyAccess
+        customPolicies: []
+        tags:
+          "{{deployment:domain}}:resource-type": role
+          "{{deployment:domain}}:category": monitoring
+          "{{deployment:domain}}:type": operations
+          "{{deployment:domain}}:component": {{deployment:id}}-cloudwatch-agent
+          "{{deployment:domain}}:organization": "{{deployment:organization}}"
+          "{{deployment:domain}}:name": "{{deployment:team:name}}"
+          "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+
+certManager:
+  chart:
+    name: cert-manager
+    repository: https://charts.jetstack.io
+    release: cert-manager
+    version: v1.19.1
+    namespace: cert-manager
+    values: helm/cert-manager.mustache
+  clusterIssuer: eks/cluster-issuer.mustache
+
+metricsServer:
+  chart:
+    name: metrics-server
+    repository: https://kubernetes-sigs.github.io/metrics-server/
+    release: metrics-server
+    version: 3.13.0
+    namespace: kube-system
+    values: helm/metrics-server.mustache
+
+externalDns:
+  chart:
+    name: external-dns
+    repository: https://kubernetes-sigs.github.io/external-dns/
+    release: external-dns
+    version: 1.19.0
+    namespace: external-dns
+    values: helm/external-dns.mustache
+  txtOwnerId: {{deployment:id}}
+  domainFilters:
+    - {{deployment:domain}}
+  serviceAccount:
+    metadata:
+      name: external-dns
+      namespace: external-dns
+      labels:
+        "{{deployment:domain}}/resource-type": service-account
+        "{{deployment:domain}}/category": dns
+        "{{deployment:domain}}/type": operations
+        "{{deployment:domain}}/component": external-dns
+        "{{deployment:domain}}/organization": "{{deployment:organization}}"
+        "{{deployment:domain}}/name": "{{deployment:team:name}}"
+        "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+      annotations: { }
+    role:
+      name: {{deployment:id}}-external-dns-sa
+      managedPolicyNames: [ ]
+      customPolicies:
+        - name: {{deployment:id}}-external-dns
+          policy: policy/external-dns.mustache
+          mappings: { }
+      tags:
+        "{{deployment:domain}}:resource-type": role
+        "{{deployment:domain}}:category": dns
+        "{{deployment:domain}}:type": operations
+        "{{deployment:domain}}:component": {{deployment:id}}-external-dns
+        "{{deployment:domain}}:organization": "{{deployment:organization}}"
+        "{{deployment:domain}}:name": "{{deployment:team:name}}"
+        "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+
+externalSecrets:
+  chart:
+    name: external-secrets
+    repository: https://charts.external-secrets.io
+    release: external-secrets
+    version: 1.1.1
+    namespace: external-secrets
+    values: helm/external-secrets.mustache
+  serviceAccount:
+    metadata:
+      name: external-secrets
+      namespace: external-secrets
+      labels:
+        "{{deployment:domain}}/resource-type": service-account
+        "{{deployment:domain}}/category": secrets
+        "{{deployment:domain}}/type": operations
+        "{{deployment:domain}}/component": external-secrets
+        "{{deployment:domain}}/organization": "{{deployment:organization}}"
+        "{{deployment:domain}}/name": "{{deployment:team:name}}"
+        "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+      annotations: { }
+    role:
+      name: {{deployment:id}}-external-secrets-sa
+      managedPolicyNames: [ ]
+      customPolicies:
+        - name: {{deployment:id}}-external-secrets-access
+          policy: policy/external-secrets-access.mustache
+          mappings:
+            region: {{deployment:region}}
+            account: {{deployment:account}}
+            prefix: {{deployment:id}}
+      tags:
+        "{{deployment:domain}}:resource-type": role
+        "{{deployment:domain}}:category": secrets
+        "{{deployment:domain}}:type": operations
+        "{{deployment:domain}}:component": {{deployment:id}}-external-secrets
+        "{{deployment:domain}}:organization": "{{deployment:organization}}"
+        "{{deployment:domain}}:name": "{{deployment:team:name}}"
+        "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+  clusterSecretStore: eks/cluster-secret-store.mustache
+
+reloader:
+  chart:
+    name: reloader
+    repository: https://stakater.github.io/stakater-charts
+    release: reloader
+    version: 2.2.5
+    namespace: reloader
+    values: helm/reloader.mustache
+
+kyverno:
+  chart:
+    name: kyverno
+    repository: https://kyverno.github.io/kyverno
+    release: kyverno
+    version: 3.6.1
+    namespace: kyverno
+    values: helm/kyverno.mustache
+
+karpenter:
+  chart:
+    name: karpenter
+    repository: oci://public.ecr.aws/karpenter/karpenter
+    release: karpenter
+    version: 1.8.2
+    namespace: kube-system
+    values: helm/karpenter.mustache
+  podIdentity:
+    metadata:
+      name: {{deployment:id}}-karpenter-sa
+      namespace: kube-system
+      labels:
+        "{{deployment:domain}}/resource-type": service-account
+        "{{deployment:domain}}/category": operations
+        "{{deployment:domain}}/type": autoscale
+        "{{deployment:domain}}/component": karpenter
+        "{{deployment:domain}}/organization": "{{deployment:organization}}"
+        "{{deployment:domain}}/name": "{{deployment:team:name}}"
+        "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+      annotations: { }
+    role:
+      name: {{deployment:id}}-karpenter-sa
+      principal:
+        type: service
+        value: pods.eks.amazonaws.com
+      managedPolicyNames: [ ]
+      customPolicies:
+        - name: {{deployment:id}}-karpenter
+          policy: policy/karpenter.mustache
+          mappings:
+            queue: {{deployment:id}}-eks
+            cluster: {{deployment:id}}-eks
+            nodeRole: arn:aws:iam::{{deployment:account}}:role/{{deployment:id}}-core-node
+        - name: {{deployment:id}}-karpenter-interrupt
+          policy: policy/karpenter-interrupt.mustache
+          mappings:
+            resources:
+              - arn:aws:sqs:{{deployment:region}}:{{deployment:account}}:{{deployment:id}}-karpenter
+      tags:
+        "{{deployment:domain}}:resource-type": pod-identity
+        "{{deployment:domain}}:category": karpenter
+        "{{deployment:domain}}:type": operations
+        "{{deployment:domain}}:component": {{deployment:id}}-eks
+        "{{deployment:domain}}:organization": "{{deployment:organization}}"
+        "{{deployment:domain}}:name": "{{deployment:team:name}}"
+        "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+  nodePools:
+    - name: default
+      ec2NodeClass:
+        name: default
+        role: {{deployment:id}}-core-node
+        amiFamily: bottlerocket
+        subnetSelectorTags:
+          "karpenter.sh/discovery": {{deployment:id}}-vpc
+          "{{deployment:domain}}:type": private_with_egress
+        securityGroupSelectorTags:
+          "aws:eks:cluster-name": {{deployment:id}}-eks
+        blockDeviceMappings:
+          - deviceName: /dev/xvda
+            ebs:
+              volumeType: gp3
+              volumeSize: 50
+              encrypted: true
+              deleteOnTermination: true
+          - deviceName: /dev/xvdb
+            ebs:
+              volumeType: gp3
+              volumeSize: 100
+              encrypted: true
+              deleteOnTermination: true
+        tags:
+          "{{deployment:domain}}:resource-type": ec2
+          "{{deployment:domain}}:category": karpenter
+          "{{deployment:domain}}:type": node
+          "{{deployment:domain}}:organization": "{{deployment:organization}}"
+          "{{deployment:domain}}:name": "{{deployment:team:name}}"
+          "karpenter.sh/discovery": {{deployment:id}}-eks
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values:
+            - on-demand
+            - spot
+        - key: kubernetes.io/arch
+          operator: In
+          values:
+            - amd64
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values:
+            - m
+            - c
+            - r
+        - key: karpenter.k8s.aws/instance-size
+          operator: In
+          values:
+            - medium
+            - large
+            - xlarge
+            - 2xlarge
+      limits:
+        cpu: 100
+        memory: 200Gi
+      disruption:
+        consolidationPolicy: WhenEmptyOrUnderutilized
+        consolidateAfter: 1m
+        budgets:
+          - nodes: 10%
+
+awsLoadBalancer:
+  chart:
+    name: aws-load-balancer-controller
+    repository: https://aws.github.io/eks-charts
+    release: aws-load-balancer-controller
+    version: 1.16.0
+    namespace: aws-load-balancer
+    values: helm/aws-load-balancer.mustache
+  serviceAccount:
+    metadata:
+      name: {{deployment:id}}-aws-load-balancer-sa
+      namespace: aws-load-balancer
+      labels:
+        "{{deployment:domain}}/resource-type": service-account
+        "{{deployment:domain}}/category": ingress
+        "{{deployment:domain}}/type": operations
+        "{{deployment:domain}}/component": aws-load-balancer
+        "{{deployment:domain}}/organization": "{{deployment:organization}}"
+        "{{deployment:domain}}/name": "{{deployment:team:name}}"
+        "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+      annotations: { }
+    role:
+      name: {{deployment:id}}-aws-load-balancer-sa
+      managedPolicyNames: [ ]
+      customPolicies:
+        - name: {{deployment:id}}-aws-load-balancer-controller
+          policy: policy/aws-load-balancer-controller.mustache
+          mappings: { }
+      tags:
+        "{{deployment:domain}}:resource-type": role
+        "{{deployment:domain}}:category": ingress
+        "{{deployment:domain}}:type": operations
+        "{{deployment:domain}}:component": {{deployment:id}}-aws-load-balancer
+        "{{deployment:domain}}:organization": "{{deployment:organization}}"
+        "{{deployment:domain}}:name": "{{deployment:team:name}}"
+        "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+
+backstage:
+  setup: setup/backstage.mustache
+  dockerImage:
+    name: {{deployment:id}}-backstage
+    directory: ../backstage-ext
+    dockerfile: Dockerfile
+    platform: linux/amd64
+    buildArgs: { }
+  chart:
+    name: backstage
+    namespace: backstage
+    release: backstage-{{deployment:team:alias}}
+    repository: ""
+    values: helm/backstage.mustache
+    version: "1.0.0"
+
+argoWorkflows:
+  setup: setup/argo-workflows.mustache
+  chart:
+    name: argo-workflows
+    repository: https://argoproj.github.io/argo-helm
+    release: argo-workflows
+    version: 0.46.1
+    namespace: argo
+    values: helm/argo-workflows.mustache
+
+argocd:
+  chart:
+    name: argo-cd
+    repository: https://argoproj.github.io/argo-helm
+    release: argocd
+    version: 9.1.6
+    namespace: argocd
+    values: helm/argocd.mustache
+  serviceAccount:
+    metadata:
+      name: argocd-repo-server
+      namespace: argocd
+      labels:
+        "{{deployment:domain}}/resource-type": service-account
+        "{{deployment:domain}}/category": ci-cd
+        "{{deployment:domain}}/type": argocd
+        "{{deployment:domain}}/component": argocd-repo-server
+        "{{deployment:domain}}/organization": "{{deployment:organization}}"
+        "{{deployment:domain}}/name": "{{deployment:team:name}}"
+        "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+      annotations: { }
+    role:
+      name: {{deployment:id}}-argocd-repo-server-sa
+      managedPolicyNames: [ ]
+      customPolicies:
+        - name: {{deployment:id}}-argocd-repo-server
+          policy: policy/argocd-repo-server.mustache
+          mappings:
+            region: {{deployment:region}}
+            account: {{deployment:account}}
+            prefix: {{deployment:id}}
+      tags:
+        "{{deployment:domain}}:resource-type": role
+        "{{deployment:domain}}:category": ci-cd
+        "{{deployment:domain}}:type": argocd
+        "{{deployment:domain}}:component": {{deployment:id}}-argocd-repo-server
+        "{{deployment:domain}}:organization": "{{deployment:organization}}"
+        "{{deployment:domain}}:name": "{{deployment:team:name}}"
+        "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+
+argoEvents:
+  chart:
+    name: argo-events
+    repository: https://argoproj.github.io/argo-helm
+    release: argo-events
+    version: 2.4.19
+    namespace: argo-events
+    values: helm/argo-events.mustache
+  controllerServiceAccount:
+    metadata:
+      name: argo-events-controller
+      namespace: argo-events
+      labels:
+        "{{deployment:domain}}/resource-type": service-account
+        "{{deployment:domain}}/category": ci-cd
+        "{{deployment:domain}}/type": argo-events
+        "{{deployment:domain}}/component": argo-events-controller
+        "{{deployment:domain}}/organization": "{{deployment:organization}}"
+        "{{deployment:domain}}/name": "{{deployment:team:name}}"
+        "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+      annotations: { }
+    role:
+      name: {{deployment:id}}-argo-events-controller-sa
+      managedPolicyNames: [ ]
+      customPolicies:
+        - name: {{deployment:id}}-argo-events-controller
+          policy: policy/argo-events-controller.mustache
+          mappings:
+            region: {{deployment:region}}
+            account: {{deployment:account}}
+      tags:
+        "{{deployment:domain}}:resource-type": role
+        "{{deployment:domain}}:category": ci-cd
+        "{{deployment:domain}}:type": argo-events
+        "{{deployment:domain}}:component": {{deployment:id}}-argo-events-controller
+        "{{deployment:domain}}:organization": "{{deployment:organization}}"
+        "{{deployment:domain}}:name": "{{deployment:team:name}}"
+        "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+
+argoRollouts:
+  chart:
+    name: argo-rollouts
+    repository: https://argoproj.github.io/argo-helm
+    release: argo-rollouts
+    version: 2.40.5
+    namespace: argo-rollouts
+    values: helm/argo-rollouts.mustache
+  controllerServiceAccount:
+    metadata:
+      name: argo-rollouts-controller
+      namespace: argo-rollouts
+      labels:
+        "{{deployment:domain}}/resource-type": service-account
+        "{{deployment:domain}}/category": ci-cd
+        "{{deployment:domain}}/type": argo-rollouts
+        "{{deployment:domain}}/component": argo-rollouts-controller
+        "{{deployment:domain}}/organization": "{{deployment:organization}}"
+        "{{deployment:domain}}/name": "{{deployment:team:name}}"
+        "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+      annotations: {}
+    role:
+      name: {{deployment:id}}-argo-rollouts-controller-sa
+      managedPolicyNames: []
+      customPolicies: []
+      tags:
+        "{{deployment:domain}}:resource-type": role
+        "{{deployment:domain}}:category": ci-cd
+        "{{deployment:domain}}:type": argo-rollouts
+        "{{deployment:domain}}:component": {{deployment:id}}-argo-rollouts-controller
+        "{{deployment:domain}}:organization": "{{deployment:organization}}"
+        "{{deployment:domain}}:name": "{{deployment:team:name}}"
+        "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+  dashboardServiceAccount:
+    metadata:
+      name: argo-rollouts-dashboard
+      namespace: argo-rollouts
+      labels:
+        "{{deployment:domain}}/resource-type": service-account
+        "{{deployment:domain}}/category": ci-cd
+        "{{deployment:domain}}/type": argo-rollouts
+        "{{deployment:domain}}/component": argo-rollouts-dashboard
+        "{{deployment:domain}}/organization": "{{deployment:organization}}"
+        "{{deployment:domain}}/name": "{{deployment:team:name}}"
+        "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+      annotations: {}
+    role:
+      name: {{deployment:id}}-argo-rollouts-dashboard-sa
+      managedPolicyNames: []
+      customPolicies: []
+      tags:
+        "{{deployment:domain}}:resource-type": role
+        "{{deployment:domain}}:category": ci-cd
+        "{{deployment:domain}}:type": argo-rollouts
+        "{{deployment:domain}}:component": {{deployment:id}}-argo-rollouts-dashboard
+        "{{deployment:domain}}:organization": "{{deployment:organization}}"
+        "{{deployment:domain}}:name": "{{deployment:team:name}}"
+        "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+  ingress: setup/argo-rollouts-ingress.mustache
+
+velero:
+  chart:
+    name: velero
+    repository: https://vmware-tanzu.github.io/helm-charts
+    release: velero
+    version: 11.2.0
+    namespace: velero
+    values: helm/velero.mustache
+  bucket:
+    name: {{deployment:id}}-velero-backups
+    region: {{deployment:region}}
+  serviceAccount:
+    metadata:
+      name: velero
+      namespace: velero
+      labels:
+        "{{deployment:domain}}/resource-type": service-account
+        "{{deployment:domain}}/category": backup
+        "{{deployment:domain}}/type": operations
+        "{{deployment:domain}}/component": velero
+        "{{deployment:domain}}/organization": "{{deployment:organization}}"
+        "{{deployment:domain}}/name": "{{deployment:team:name}}"
+        "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+      annotations: { }
+    role:
+      name: {{deployment:id}}-velero-sa
+      managedPolicyNames: [ ]
+      customPolicies:
+        - name: {{deployment:id}}-velero
+          policy: policy/velero.mustache
+          mappings:
+            region: {{deployment:region}}
+            account: {{deployment:account}}
+            bucket: {{deployment:id}}-velero-backups
+      tags:
+        "{{deployment:domain}}:resource-type": role
+        "{{deployment:domain}}:category": backup
+        "{{deployment:domain}}:type": operations
+        "{{deployment:domain}}:component": {{deployment:id}}-velero
+        "{{deployment:domain}}:organization": "{{deployment:organization}}"
+        "{{deployment:domain}}:name": "{{deployment:team:name}}"
+        "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+
+goldilocks:
+  chart:
+    name: goldilocks
+    repository: https://charts.fairwinds.com/stable
+    release: goldilocks
+    version: 10.1.0
+    namespace: goldilocks
+    values: helm/goldilocks.mustache
+
+nodeTerminationHandler:
+  chart:
+    name: aws-node-termination-handler
+    repository: https://aws.github.io/eks-charts
+    release: aws-node-termination-handler
+    version: 0.21.0
+    namespace: kube-system
+    values: helm/node-termination-handler.mustache
+
+grafana:
+  chart:
+    name: k8s-monitoring
+    repository: https://grafana.github.io/helm-charts
+    release: k8s-monitoring
+    version: 3.6.2
+    namespace: monitoring
+    values: helm/grafana.mustache
+  secret: {{deployment:eks:grafana:secret}}

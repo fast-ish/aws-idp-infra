@@ -1,0 +1,33 @@
+nodeSelector:
+  "eks.amazonaws.com/nodegroup": {{deployment:id}}-core-node
+
+replicas: 2
+
+settings:
+  clusterName: {{deployment:id}}-eks
+  interruptionQueue: {{deployment:id}}-karpenter
+  # Batch settings for consolidation
+  batchMaxDuration: 10s
+  batchIdleDuration: 1s
+
+serviceAccount:
+  create: false
+  name: {{deployment:id}}-karpenter-sa
+
+controller:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceMonitor:
+  enabled: false
+
+logLevel: info

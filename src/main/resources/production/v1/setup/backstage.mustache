@@ -1,0 +1,77 @@
+secret: {{deployment:id}}-backstage-github-oauth
+
+serviceAccount:
+  metadata:
+    name: {{deployment:id}}-backstage-sa
+    namespace: backstage
+    labels:
+      "{{deployment:domain}}/resource-type": service-account
+      "{{deployment:domain}}/category": compute
+      "{{deployment:domain}}/type": backstage
+      "{{deployment:domain}}/component": backstage
+      "{{deployment:domain}}/organization": "{{deployment:organization}}"
+      "{{deployment:domain}}/name": "{{deployment:team:name}}"
+      "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+    annotations: { }
+  role:
+    name: {{deployment:id}}-backstage-sa-role
+    principal:
+      type: service
+      value: ec2.amazonaws.com
+    managedPolicyNames: [ ]
+    customPolicies:
+      - name: {{deployment:id}}-backstage-secret-access
+        policy: policy/secret-access.mustache
+        mappings:
+          resources:
+            - arn:aws:secretsmanager:{{deployment:region}}:{{deployment:account}}:secret:{{deployment:id}}-backstage-db-credentials*
+            - arn:aws:secretsmanager:{{deployment:region}}:{{deployment:account}}:secret:{{deployment:id}}-backstage-github-oauth*
+    tags:
+      "{{deployment:domain}}:resource-type": role
+      "{{deployment:domain}}:category": compute
+      "{{deployment:domain}}:type": backstage
+      "{{deployment:domain}}:component": {{deployment:id}}-backstage
+      "{{deployment:domain}}:organization": "{{deployment:organization}}"
+      "{{deployment:domain}}:name": "{{deployment:team:name}}"
+      "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+
+database:
+  version: "17.6"
+  name: {{deployment:id}}-backstage-db
+  databaseName: backstage
+  storageType: aurora_iopt1
+  enableDataApi: true
+  deletionProtection: true
+  removalPolicy: retain
+  credentials:
+    name: {{deployment:id}}-backstage-db-credentials
+    description: Backstage PostgreSQL database credentials
+    username: backstage_admin
+    password:
+      length: 32
+      excludeNumbers: false
+      excludeLowercase: false
+      excludeUppercase: false
+      includeSpace: false
+    removalPolicy: retain
+    tags:
+      "{{deployment:domain}}:resource-type": secret
+      "{{deployment:domain}}:category": database
+      "{{deployment:domain}}:component": {{deployment:id}}-backstage-db
+  writer:
+    name: backstage-writer
+    allowMajorVersionUpgrade: false
+    autoMinorVersionUpgrade: true
+    publiclyAccessible: false
+    performanceInsights:
+      enabled: true
+      retention: default
+  readers: [ ]
+  tags:
+    "{{deployment:domain}}:resource-type": rds
+    "{{deployment:domain}}:category": database
+    "{{deployment:domain}}:type": postgresql
+    "{{deployment:domain}}:component": {{deployment:id}}-backstage-db
+    "{{deployment:domain}}:organization": "{{deployment:organization}}"
+    "{{deployment:domain}}:name": "{{deployment:team:name}}"
+    "{{deployment:domain}}:alias": "{{deployment:team:alias}}"

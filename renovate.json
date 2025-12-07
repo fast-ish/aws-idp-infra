@@ -1,0 +1,34 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["addons\\.mustache$"],
+      "matchStrings": [
+        "name:\\s*(?<depName>vpc-cni|aws-ebs-csi-driver|kube-proxy|coredns|eks-pod-identity-agent|amazon-cloudwatch-observability)\\n\\s+version:\\s*(?<currentValue>v[\\d.]+-eksbuild\\.\\d+)"
+      ],
+      "datasourceTemplate": "aws-eks-addon",
+      "versioningTemplate": "loose"
+    }
+  ],
+  "schedule": ["at any time"],
+  "timezone": "UTC",
+  "prConcurrentLimit": 5,
+  "automerge": true,
+  "automergeType": "pr",
+  "platformAutomerge": true,
+  "ignoreDeps": ["fastish:cdk-common"],
+  "packageRules": [
+    {
+      "description": "Automerge minor and patch updates",
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "automerge": true
+    },
+    {
+      "description": "Ignore internal fastish dependencies",
+      "matchPackageNames": ["fastish:cdk-common"],
+      "enabled": false
+    }
+  ]
+}

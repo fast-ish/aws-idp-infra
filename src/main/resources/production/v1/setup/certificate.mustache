@@ -1,0 +1,13 @@
+domainName: "*.{{deployment:domain}}"
+subjectAlternativeNames:
+  - "{{deployment:domain}}"
+validationMethod: DNS
+removalPolicy: retain
+tags:
+  "{{deployment:domain}}:resource-type": certificate
+  "{{deployment:domain}}:category": security
+  "{{deployment:domain}}:type": tls
+  "{{deployment:domain}}:component": {{deployment:id}}-backstage
+  "{{deployment:domain}}:organization": "{{deployment:organization}}"
+  "{{deployment:domain}}:name": "{{deployment:team:name}}"
+  "{{deployment:domain}}:alias": "{{deployment:team:alias}}"

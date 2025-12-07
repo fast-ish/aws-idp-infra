@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "backstage.fullname" . }}-config
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+data:
+  app-config.yaml: |
+    app:
+      title: Backstage
+      baseUrl: https://{{ (index .Values.ingress.hosts 0).host }}
+
+    organization:
+      name: {{ .Values.organization }}
+
+    backend:
+      baseUrl: https://{{ (index .Values.ingress.hosts 0).host }}
+      listen:
+        port: 7007
+      csp:
+        connect-src: ["'self'", 'http:', 'https:']
+      cors:
+        origin: https://{{ (index .Values.ingress.hosts 0).host }}
+        methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+        credentials: true
+      database:
+        client: pg
+        connection:
+          host: ${POSTGRES_HOST}
+          port: ${POSTGRES_PORT}
+          user: ${POSTGRES_USER}
+          password: ${POSTGRES_PASSWORD}
+          database: {{ .Values.database.name }}
+          ssl:
+            rejectUnauthorized: true
+            ca:
+              $file: /etc/ssl/certs/rds-ca-bundle.pem
+
+    auth:
+      environment: {{ .Values.environment }}
+      providers:
+        github:
+          {{ .Values.environment }}:
+            clientId: ${AUTH_GITHUB_CLIENT_ID}
+            clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
+
+    catalog:
+      import:
+        entityFilename: catalog-info.yaml
+        pullRequestBranchName: backstage-integration
+      rules:
+        - allow: [Component, System, API, Resource, Location]
+
+    techdocs:
+      builder: external
+      generator:
+        runIn: local
+      publisher:
+        type: local

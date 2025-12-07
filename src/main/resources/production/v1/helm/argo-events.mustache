@@ -1,0 +1,94 @@
+global:
+  image:
+    pullPolicy: IfNotPresent
+
+crds:
+  install: true
+  keep: true
+
+controller:
+  replicas: 2
+
+  serviceAccount:
+    create: false
+    name: argo-events-controller
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+  containerSecurityContext:
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  extraArgs:
+    - --leader-elect
+
+configs:
+  jetstream:
+    versions:
+      - version: latest
+        url: nats://nats:4222
+        streamConfig:
+          maxAge: 72h
+          replicas: 3
+
+eventbus:
+  native:
+    replicas: 3
+    auth: token
+    persistence:
+      storageClassName: gp3
+      volumeSize: 10Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    containerSecurityContext:
+      readOnlyRootFilesystem: false
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+
+webhook:
+  enabled: true
+  replicas: 2
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+  containerSecurityContext:
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL

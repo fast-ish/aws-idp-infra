@@ -1,0 +1,396 @@
+global:
+  domain: argocd.{{domain}}
+  logging:
+    format: json
+    level: info
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+
+configs:
+  params:
+    server.insecure: true
+    controller.status.processors: 20
+    controller.operation.processors: 10
+    controller.self.heal.timeout.seconds: 5
+    controller.repo.server.timeout.seconds: 60
+    reposerver.parallelism.limit: 0
+
+  cm:
+    url: https://argocd.{{domain}}
+    exec.enabled: "true"
+    admin.enabled: "true"
+    timeout.reconciliation: 180s
+    timeout.hard.reconciliation: 0s
+
+    dex.config: |
+      connectors:
+        - type: github
+          id: github
+          name: GitHub
+          config:
+            clientID: $dex.github.clientID
+            clientSecret: $dex.github.clientSecret
+            orgs:
+              - name: {{github.org}}
+      staticClients:
+        - id: argo-workflows
+          name: Argo Workflows
+          redirectURIs:
+            - https://workflows.{{domain}}/oauth2/callback
+          secretEnv: ARGO_WORKFLOWS_SSO_CLIENT_SECRET
+        - id: argo-rollouts
+          name: Argo Rollouts
+          redirectURIs:
+            - https://rollouts.{{domain}}/oauth2/idpresponse
+          secretEnv: ARGO_ROLLOUTS_SSO_CLIENT_SECRET
+
+    kustomize.buildOptions: --enable-helm --load-restrictor LoadRestrictionsNone
+
+    resource.customizations.health.argoproj.io_Application: |
+      hs = {}
+      hs.status = "Progressing"
+      hs.message = ""
+      if obj.status ~= nil then
+        if obj.status.health ~= nil then
+          hs.status = obj.status.health.status
+          if obj.status.health.message ~= nil then
+            hs.message = obj.status.health.message
+          end
+        end
+      end
+      return hs
+
+    resource.customizations.health.argoproj.io_Rollout: |
+      hs = {}
+      if obj.status == nil then
+        hs.status = "Progressing"
+        hs.message = "Waiting for rollout status"
+        return hs
+      end
+      if obj.status.phase == "Healthy" then
+        hs.status = "Healthy"
+      elseif obj.status.phase == "Paused" then
+        hs.status = "Suspended"
+        hs.message = "Rollout paused"
+      elseif obj.status.phase == "Progressing" then
+        hs.status = "Progressing"
+      elseif obj.status.phase == "Degraded" then
+        hs.status = "Degraded"
+      else
+        hs.status = "Unknown"
+      end
+      return hs
+
+    resource.exclusions: |
+      - apiGroups:
+          - cilium.io
+        kinds:
+          - CiliumIdentity
+        clusters:
+          - "*"
+      - apiGroups:
+          - ""
+        kinds:
+          - Event
+        clusters:
+          - "*"
+
+    application.resourceTrackingMethod: annotation
+
+  rbac:
+    policy.default: role:readonly
+    policy.csv: |
+      p, role:admin, applications, *, */*, allow
+      p, role:admin, clusters, *, *, allow
+      p, role:admin, repositories, *, *, allow
+      p, role:admin, projects, *, *, allow
+      p, role:admin, accounts, *, *, allow
+      p, role:admin, gpgkeys, *, *, allow
+      p, role:admin, logs, get, *, allow
+      p, role:admin, exec, create, */*, allow
+      g, admin, role:admin
+
+      p, role:team-lead, applications, *, team-*/*, allow
+      p, role:team-lead, logs, get, team-*/*, allow
+      p, role:team-lead, exec, create, team-*/*, allow
+      p, role:team-lead, repositories, get, *, allow
+
+      p, role:developer, applications, get, */*, allow
+      p, role:developer, applications, sync, team-*/*, allow
+      p, role:developer, logs, get, team-*/*, allow
+      p, role:developer, repositories, get, *, allow
+
+    scopes: "[groups, email]"
+
+
+controller:
+  replicas: 2
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+server:
+  replicas: 2
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  ingress:
+    enabled: true
+    controller: aws
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/certificate-arn: "{{certificate.arn}}"
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+      alb.ingress.kubernetes.io/healthcheck-path: /healthz
+      alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+      alb.ingress.kubernetes.io/backend-protocol: HTTP
+      alb.ingress.kubernetes.io/group.name: argo
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+repoServer:
+  replicas: 2
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+  serviceAccount:
+    create: false
+    name: argocd-repo-server
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+applicationSet:
+  replicas: 2
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+notifications:
+  enabled: true
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+  notifiers:
+    service.slack: |
+      token: $slack-token
+
+  subscriptions:
+    - recipients:
+        - slack:platform-deployments
+      triggers:
+        - on-sync-succeeded
+        - on-sync-failed
+        - on-health-degraded
+
+  templates:
+    template.app-sync-succeeded: |
+      message: |
+        Application {{.app.metadata.name}} sync succeeded.
+        Revision: {{.app.status.sync.revision}}
+
+    template.app-sync-failed: |
+      message: |
+        Application {{.app.metadata.name}} sync failed.
+        Error: {{.app.status.operationState.message}}
+
+    template.app-health-degraded: |
+      message: |
+        Application {{.app.metadata.name}} health degraded.
+        Status: {{.app.status.health.status}}
+
+  triggers:
+    trigger.on-sync-succeeded: |
+      - when: app.status.operationState.phase in ['Succeeded']
+        send: [app-sync-succeeded]
+
+    trigger.on-sync-failed: |
+      - when: app.status.operationState.phase in ['Failed', 'Error']
+        send: [app-sync-failed]
+
+    trigger.on-health-degraded: |
+      - when: app.status.health.status == 'Degraded'
+        send: [app-health-degraded]
+
+dex:
+  enabled: true
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  env:
+    - name: ARGO_WORKFLOWS_SSO_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: argo-workflows-sso
+          key: client-secret
+    - name: ARGO_ROLLOUTS_SSO_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: argo-rollouts-sso
+          key: client-secret
+
+redis:
+  enabled: true
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+redis-ha:
+  enabled: false
+
+extraObjects:
+  - apiVersion: external-secrets.io/v1
+    kind: ExternalSecret
+    metadata:
+      name: argocd-github-oauth
+      namespace: argocd
+      labels:
+        app.kubernetes.io/part-of: argocd
+    spec:
+      refreshInterval: 1h
+      secretStoreRef:
+        name: aws-secrets-manager
+        kind: ClusterSecretStore
+      target:
+        name: argocd-secret
+        creationPolicy: Owner
+      data:
+        - secretKey: server.secretkey
+          remoteRef:
+            key: {{github.oauthSecretName}}
+            property: server_secretkey
+        - secretKey: dex.github.clientID
+          remoteRef:
+            key: {{github.oauthSecretName}}
+            property: client_id
+        - secretKey: dex.github.clientSecret
+          remoteRef:
+            key: {{github.oauthSecretName}}
+            property: client_secret
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: argo-workflows-sso
+      namespace: argocd
+      labels:
+        app.kubernetes.io/part-of: argocd
+    type: Opaque
+    stringData:
+      client-id: argo-workflows
+      client-secret: "{{argoWorkflows.ssoClientSecret}}"
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: argo-rollouts-sso
+      namespace: argocd
+      labels:
+        app.kubernetes.io/part-of: argocd
+    type: Opaque
+    stringData:
+      client-id: argo-rollouts
+      client-secret: "{{argoRollouts.ssoClientSecret}}"
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: argo-rollouts-alb-oidc
+      namespace: argo-rollouts
+      labels:
+        app.kubernetes.io/part-of: argocd
+    type: Opaque
+    stringData:
+      clientId: argo-rollouts
+      clientSecret: "{{argoRollouts.ssoClientSecret}}"
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    metadata:
+      name: alb-controller-secrets-reader
+      namespace: argo-rollouts
+    rules:
+      - apiGroups: [""]
+        resources: ["secrets"]
+        verbs: ["get", "list", "watch"]
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: alb-controller-secrets-reader
+      namespace: argo-rollouts
+    subjects:
+      - kind: ServiceAccount
+        name: {{alb.serviceAccountName}}
+        namespace: aws-load-balancer
+    roleRef:
+      kind: Role
+      name: alb-controller-secrets-reader
+      apiGroup: rbac.authorization.k8s.io

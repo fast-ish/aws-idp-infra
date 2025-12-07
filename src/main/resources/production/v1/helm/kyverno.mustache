@@ -1,0 +1,92 @@
+replicaCount: 3
+
+admissionController:
+  replicas: 3
+  resources:
+    limits:
+      memory: 384Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+backgroundController:
+  replicas: 2
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+
+cleanupController:
+  replicas: 2
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+
+reportsController:
+  replicas: 2
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+
+config:
+  webhooks:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - kube-system
+  excludeKyvernoNamespace: true
+
+features:
+  admissionReports:
+    enabled: true
+  aggregateReports:
+    enabled: true
+  policyReports:
+    enabled: true
+  validatingAdmissionPolicyReports:
+    enabled: false
+  autoUpdateWebhooks:
+    enabled: true
+  backgroundScan:
+    enabled: true
+    backgroundScanWorkers: 2
+    backgroundScanInterval: 1h
+  configMapCaching:
+    enabled: true
+  deferredLoading:
+    enabled: true
+  logging:
+    format: json
+  omitEvents:
+    eventTypes: []
+  policyExceptions:
+    enabled: true
+    namespace: kyverno
+  protectManagedResources:
+    enabled: false
+  registryClient:
+    allowInsecure: false
+    credentialHelpers:
+      - default
+      - amazon
+  reports:
+    chunkSize: 1000
+  ttlController:
+    reconciliationInterval: 1m
+
+metricsConfig:
+  metricsExposure:
+    enabled: true
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"

@@ -1,0 +1,27 @@
+replicas: 2
+
+nodeSelector:
+  "eks.amazonaws.com/nodegroup": {{deployment:id}}-core-node
+
+args:
+  - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+  - --kubelet-use-node-status-port
+  - --metric-resolution=15s
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+metrics:
+  enabled: true
+
+serviceMonitor:
+  enabled: false

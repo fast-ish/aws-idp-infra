@@ -1,0 +1,129 @@
+platform:
+  id: {{platform:id}}
+  organization: {{platform:organization}}
+  account: {{platform:account}}
+  region: {{platform:region}}
+  name: {{platform:name}}
+  alias: {{platform:alias}}
+  environment: {{platform:environment}}
+  version: {{platform:version}}
+  domain: {{platform:domain}}
+  tags: {}
+
+release:
+  common:
+    id: {{deployment:id}}
+    organization: {{deployment:organization}}
+    account: {{deployment:account}}
+    region: {{deployment:region}}
+    name: {{deployment:team:name}}
+    alias: {{deployment:team:alias}}
+    environment: {{deployment:environment}}
+    version: {{deployment:version}}
+    domain: {{deployment:domain}}
+    tags:
+      "{{deployment:domain}}:billing": {{deployment:organization}}
+      "{{deployment:domain}}:managed-by": {{deployment:organization}}
+      "{{deployment:domain}}:account": {{deployment:account}}
+      "{{deployment:domain}}:region": {{deployment:region}}
+      "{{deployment:domain}}:name": {{deployment:team:name}}
+      "{{deployment:domain}}:alias": {{deployment:team:alias}}
+      {{#deployment:tags}}
+      "{{key}}": "{{value}}"
+      {{/deployment:tags}}
+
+  vpc:
+    name: {{deployment:id}}-vpc
+    cidr: 10.0.0.0/16
+    ipProtocol: ipv4_only
+    natGateways: 2
+    createInternetGateway: true
+    availabilityZones:
+      - {{deployment:region}}a
+      - {{deployment:region}}b
+      - {{deployment:region}}c
+    enableDnsSupport: true
+    enableDnsHostnames: true
+    defaultInstanceTenancy: default
+    securityGroups: [ ]
+    subnets:
+      - name: public
+        cidrMask: 24
+        reserved: false
+        subnetType: public
+        mapPublicIpOnLaunch: false
+        tags:
+          "{{deployment:domain}}:resource-type": subnet
+          "{{deployment:domain}}:category": network
+          "{{deployment:domain}}:type": public
+          "{{deployment:domain}}:cidrMask": 24
+          "{{deployment:domain}}:component": {{deployment:id}}-vpc
+          "{{deployment:domain}}:organization": "{{deployment:organization}}"
+          "{{deployment:domain}}:name": "{{deployment:team:name}}"
+          "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+          "karpenter.sh/discovery": {{deployment:id}}-vpc
+      - name: private
+        cidrMask: 24
+        reserved: false
+        subnetType: private_with_egress
+        tags:
+          "{{deployment:domain}}:resource-type": subnet
+          "{{deployment:domain}}:category": network
+          "{{deployment:domain}}:type": private_with_egress
+          "{{deployment:domain}}:cidrMask": 24
+          "{{deployment:domain}}:component": {{deployment:id}}-vpc
+          "{{deployment:domain}}:organization": "{{deployment:organization}}"
+          "{{deployment:domain}}:name": "{{deployment:team:name}}"
+          "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+          "karpenter.sh/discovery": {{deployment:id}}-vpc
+    tags:
+      "{{deployment:domain}}:resource-type": vpc
+      "{{deployment:domain}}:category": network
+      "{{deployment:domain}}:type": network
+      "{{deployment:domain}}:cidrMask": 24
+      "{{deployment:domain}}:component": {{deployment:id}}-vpc
+      "{{deployment:domain}}:organization": "{{deployment:organization}}"
+      "{{deployment:domain}}:name": "{{deployment:team:name}}"
+      "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+
+  eks:
+    name: {{deployment:id}}-eks
+    version: "1.34"
+    endpointAccess: public_and_private
+    prune: true
+    bootstrapSelfManagedAddons: false
+    vpcSubnetTypes:
+      - public
+      - private_with_egress
+    rbac: eks/rbac.mustache
+    tenancy: eks/tenancy.mustache
+    nodeGroups: eks/node-groups.mustache
+    addons: eks/addons.mustache
+    sqs: eks/sqs.mustache
+    observability: eks/observability.mustache
+    loggingTypes:
+      - api
+      - audit
+      - authenticator
+      - controller_manager
+      - scheduler
+    annotations: { }
+    labels:
+      "{{deployment:domain}}/billing": {{deployment:organization}}
+      "{{deployment:domain}}/managed-by": {{deployment:organization}}
+      "{{deployment:domain}}/account": {{deployment:account}}
+      "{{deployment:domain}}/region": {{deployment:region}}
+      "{{deployment:domain}}/version": {{deployment:version}}
+      "{{deployment:domain}}/name": "{{deployment:team:name}}"
+      "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+    tags:
+      "{{deployment:domain}}:resource-type": eks
+      "{{deployment:domain}}:category": eks
+      "{{deployment:domain}}:type": backstage
+      "{{deployment:domain}}:component": {{deployment:id}}-eks
+      "{{deployment:domain}}:organization": "{{deployment:organization}}"
+      "{{deployment:domain}}:name": "{{deployment:team:name}}"
+      "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+      "karpenter.sh/discovery": {{deployment:id}}-vpc
+
+  certificate: setup/certificate.mustache

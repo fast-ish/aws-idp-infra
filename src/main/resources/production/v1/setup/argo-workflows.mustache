@@ -1,0 +1,153 @@
+workflowNamespaces:
+  - team-backend
+  - team-frontend
+  - team-data
+  - team-ml
+  - team-integrations
+
+serverServiceAccount:
+  metadata:
+    name: argo-server
+    namespace: argo
+    labels:
+      "{{deployment:domain}}/resource-type": service-account
+      "{{deployment:domain}}/category": ci-cd
+      "{{deployment:domain}}/type": argo-workflows
+      "{{deployment:domain}}/component": argo-server
+      "{{deployment:domain}}/organization": "{{deployment:organization}}"
+      "{{deployment:domain}}/name": "{{deployment:team:name}}"
+      "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+    annotations: { }
+  role:
+    name: {{deployment:id}}-argo-server-sa
+    managedPolicyNames: [ ]
+    customPolicies:
+      - name: {{deployment:id}}-argo-server-s3
+        policy: policy/argo-workflows-server.mustache
+        mappings:
+          bucket: {{deployment:id}}-argo-artifacts
+    tags:
+      "{{deployment:domain}}:resource-type": role
+      "{{deployment:domain}}:category": ci-cd
+      "{{deployment:domain}}:type": argo-workflows
+      "{{deployment:domain}}:component": {{deployment:id}}-argo-server
+      "{{deployment:domain}}:organization": "{{deployment:organization}}"
+      "{{deployment:domain}}:name": "{{deployment:team:name}}"
+      "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+
+controllerServiceAccount:
+  metadata:
+    name: argo-workflow-controller
+    namespace: argo
+    labels:
+      "{{deployment:domain}}/resource-type": service-account
+      "{{deployment:domain}}/category": ci-cd
+      "{{deployment:domain}}/type": argo-workflows
+      "{{deployment:domain}}/component": argo-controller
+      "{{deployment:domain}}/organization": "{{deployment:organization}}"
+      "{{deployment:domain}}/name": "{{deployment:team:name}}"
+      "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+    annotations: { }
+  role:
+    name: {{deployment:id}}-argo-controller-sa
+    managedPolicyNames: [ ]
+    customPolicies:
+      - name: {{deployment:id}}-argo-controller-s3
+        policy: policy/argo-workflows-controller.mustache
+        mappings:
+          bucket: {{deployment:id}}-argo-artifacts
+    tags:
+      "{{deployment:domain}}:resource-type": role
+      "{{deployment:domain}}:category": ci-cd
+      "{{deployment:domain}}:type": argo-workflows
+      "{{deployment:domain}}:component": {{deployment:id}}-argo-controller
+      "{{deployment:domain}}:organization": "{{deployment:organization}}"
+      "{{deployment:domain}}:name": "{{deployment:team:name}}"
+      "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+
+executorServiceAccount:
+  metadata:
+    name: argo-workflow
+    namespace: argo
+    labels:
+      "{{deployment:domain}}/resource-type": service-account
+      "{{deployment:domain}}/category": ci-cd
+      "{{deployment:domain}}/type": argo-workflows
+      "{{deployment:domain}}/component": argo-executor
+      "{{deployment:domain}}/organization": "{{deployment:organization}}"
+      "{{deployment:domain}}/name": "{{deployment:team:name}}"
+      "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+    annotations: { }
+  role:
+    name: {{deployment:id}}-argo-executor-sa
+    managedPolicyNames: [ ]
+    customPolicies:
+      - name: {{deployment:id}}-argo-executor
+        policy: policy/argo-workflows-executor.mustache
+        mappings:
+          region: {{deployment:region}}
+          account: {{deployment:account}}
+          bucket: {{deployment:id}}-argo-artifacts
+          prefix: {{deployment:id}}
+    tags:
+      "{{deployment:domain}}:resource-type": role
+      "{{deployment:domain}}:category": ci-cd
+      "{{deployment:domain}}:type": argo-workflows
+      "{{deployment:domain}}:component": {{deployment:id}}-argo-executor
+      "{{deployment:domain}}:organization": "{{deployment:organization}}"
+      "{{deployment:domain}}:name": "{{deployment:team:name}}"
+      "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+
+artifactBucket:
+  name: {{deployment:id}}-argo-artifacts
+  removalPolicy: retain
+
+database:
+  version: "17.6"
+  name: {{deployment:id}}-argo-workflows-db
+  databaseName: argo_workflows
+  storageType: aurora_iopt1
+  enableDataApi: true
+  deletionProtection: true
+  removalPolicy: retain
+  credentials:
+    name: {{deployment:id}}-argo-workflows-db-credentials
+    description: Argo Workflows PostgreSQL database credentials
+    username: argo_admin
+    password:
+      length: 32
+      excludeNumbers: false
+      excludeLowercase: false
+      excludeUppercase: false
+      includeSpace: false
+    removalPolicy: retain
+    tags:
+      "{{deployment:domain}}:resource-type": secret
+      "{{deployment:domain}}:category": database
+      "{{deployment:domain}}:component": {{deployment:id}}-argo-workflows-db
+  writer:
+    name: argo-workflows-writer
+    allowMajorVersionUpgrade: false
+    autoMinorVersionUpgrade: true
+    publiclyAccessible: false
+    performanceInsights:
+      enabled: true
+      retention: default
+  readers: [ ]
+  tags:
+    "{{deployment:domain}}:resource-type": rds
+    "{{deployment:domain}}:category": database
+    "{{deployment:domain}}:type": postgresql
+    "{{deployment:domain}}:component": {{deployment:id}}-argo-workflows-db
+    "{{deployment:domain}}:organization": "{{deployment:organization}}"
+    "{{deployment:domain}}:name": "{{deployment:team:name}}"
+    "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+
+labels:
+  "app.kubernetes.io/managed-by": "{{deployment:id}}"
+  "app.kubernetes.io/part-of": "argo-workflows"
+  "{{deployment:domain}}/namespace": "argo"
+  "{{deployment:domain}}/category": "workflows"
+
+annotations:
+  "argo-workflows.argoproj.io/managed": true

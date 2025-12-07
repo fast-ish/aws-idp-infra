@@ -1,0 +1,32 @@
+provider:
+  name: aws
+
+aws:
+  region: {{deployment:region}}
+
+txtOwnerId: {{deployment:dns:txtOwnerId}}
+domainFilters:
+{{#deployment:dns:domainFilters}}
+  - {{.}}
+{{/deployment:dns:domainFilters}}
+
+policy: sync
+
+serviceAccount:
+  create: false
+  name: external-dns
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+nodeSelector:
+  "eks.amazonaws.com/nodegroup": {{deployment:id}}-core-node
