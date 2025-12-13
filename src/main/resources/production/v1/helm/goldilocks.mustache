@@ -1,0 +1,65 @@
+# Goldilocks Helm values for VPA recommendations dashboard
+# https://github.com/FairwindsOps/charts/tree/master/stable/goldilocks
+
+# Enable VPA installation as subchart (required for Goldilocks)
+vpa:
+  enabled: true
+
+# Dashboard configuration
+dashboard:
+  enabled: true
+  replicaCount: 1
+
+  # Resources
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+  # No node selector - run on any available node
+  nodeSelector: {}
+
+  # Ingress configuration
+  ingress:
+    enabled: true
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internal
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+      alb.ingress.kubernetes.io/group.name: platform
+    hosts:
+      - host: goldilocks.{{deployment:domain}}
+        paths:
+          - path: /
+            type: Prefix
+
+# Controller configuration
+controller:
+  enabled: true
+  replicaCount: 1
+
+  # Only watch namespaces with goldilocks label
+  labelSelector:
+    matchLabels:
+      goldilocks.fairwinds.com/enabled: "true"
+
+  # Resources
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+  # No node selector - run on any available node
+  nodeSelector: {}
+
+  # Flags for VPA recommendations
+  flags:
+    on-by-default: false

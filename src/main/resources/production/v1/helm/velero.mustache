@@ -1,0 +1,123 @@
+# Velero Helm values for backup and disaster recovery
+# https://github.com/vmware-tanzu/helm-charts/tree/main/charts/velero
+
+# Use existing service account created by CDK with IRSA
+serviceAccount:
+  server:
+    create: false
+    name: velero
+
+# Velero configuration
+configuration:
+  # AWS provider for backup storage
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: {{deployment:id}}-velero-backups
+      config:
+        region: {{deployment:region}}
+
+  # Volume snapshot location
+  volumeSnapshotLocation:
+    - name: default
+      provider: aws
+      config:
+        region: {{deployment:region}}
+
+  # Move data for cross-region restores
+  defaultSnapshotMoveData: true
+
+  # Log level
+  logLevel: info
+
+  # Features
+  features: EnableCSI
+
+# AWS plugin for S3 and EBS
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:v1.13.1
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+# Backup schedules
+schedules:
+  # Daily full cluster backup (excluding system namespaces)
+  daily-cluster-backup:
+    disabled: false
+    schedule: "0 3 * * *"
+    useOwnerReferencesInBackup: false
+    template:
+      includedNamespaces:
+        - "*"
+      excludedNamespaces:
+        - kube-system
+        - kube-public
+        - kube-node-lease
+        - velero
+      ttl: 720h  # 30 days
+      storageLocation: default
+      volumeSnapshotLocations:
+        - default
+      snapshotMoveData: true
+
+  # Hourly backup for critical namespaces
+  hourly-critical-backup:
+    disabled: false
+    schedule: "0 * * * *"
+    useOwnerReferencesInBackup: false
+    template:
+      includedNamespaces:
+        - prod-*
+        - team-*
+      labelSelector:
+        matchLabels:
+          fasti.sh/backup: critical
+      ttl: 168h  # 7 days
+      storageLocation: default
+      volumeSnapshotLocations:
+        - default
+
+  # Weekly full backup with longer retention
+  weekly-full-backup:
+    disabled: false
+    schedule: "0 1 * * 0"
+    useOwnerReferencesInBackup: false
+    template:
+      includedNamespaces:
+        - "*"
+      excludedNamespaces:
+        - kube-system
+        - velero
+      ttl: 2160h  # 90 days
+      storageLocation: default
+      volumeSnapshotLocations:
+        - default
+      snapshotMoveData: true
+
+# Resource requests/limits
+resources:
+  requests:
+    cpu: 500m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
+# No node selector - run on any available node
+nodeSelector: {}
+
+# Prometheus metrics
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: velero
+
+# Disable upgradeCRDs - CRDs are installed with initial chart installation
+# The pre-upgrade job causes issues with various kubectl images
+upgradeCRDs: false
+
+# Deploy on one replica
+replicas: 1

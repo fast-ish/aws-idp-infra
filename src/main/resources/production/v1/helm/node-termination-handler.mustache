@@ -1,0 +1,78 @@
+# AWS Node Termination Handler Helm values
+# https://github.com/aws/eks-charts/tree/master/stable/aws-node-termination-handler
+
+# Enable spot interruption draining
+enableSpotInterruptionDraining: true
+
+# Enable rebalance recommendation monitoring
+enableRebalanceMonitoring: true
+enableRebalanceDraining: true
+
+# Enable scheduled event draining
+enableScheduledEventDraining: true
+
+# Prometheus metrics
+enablePrometheusServer: true
+prometheusServerPort: 9092
+
+# Pod termination grace period
+podTerminationGracePeriod: 120
+
+# Node termination grace period
+nodeTerminationGracePeriod: 120
+
+# Cordon only (do not drain)
+cordonOnly: false
+
+# Taint node on termination
+taintNode: true
+
+# Delete local data (emptyDir volumes)
+deleteLocalData: true
+
+# Ignore daemon sets when draining
+ignoreDaemonSets: true
+
+# JSON logging
+jsonLogging: true
+
+# Log level
+logLevel: info
+
+# Webhook configuration (optional - for notifications)
+webhookURL: ""
+webhookTemplate: ""
+
+# Node selector - run on spot instances
+nodeSelector:
+  karpenter.sh/capacity-type: spot
+
+# Tolerations - tolerate spot taints
+tolerations:
+  - key: "karpenter.sh/capacity-type"
+    operator: "Equal"
+    value: "spot"
+    effect: "NoSchedule"
+
+# Resources
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+# Pod priority class
+priorityClassName: system-node-critical
+
+# DaemonSet update strategy
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+
+# Service account
+serviceAccount:
+  create: true
+  name: aws-node-termination-handler
