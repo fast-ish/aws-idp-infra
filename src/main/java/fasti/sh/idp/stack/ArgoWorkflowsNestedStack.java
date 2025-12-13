@@ -58,12 +58,14 @@ public class ArgoWorkflowsNestedStack extends NestedStack {
   ) {
     super(scope, "argoworkflows", props);
 
+    var argoWorkflowsSetupStack = setup.argoWorkflows();
+
     log.debug(
       "{} [common: {} conf: {} database: {} bucket: {} certificate: {}]", "ArgoWorkflowsNestedStack",
       common,
       conf,
-      setup.argoWorkflowsDb().cluster().getClusterIdentifier(),
-      setup.argoWorkflowsArtifacts().bucket().getBucketName(),
+      argoWorkflowsSetupStack.database().cluster().getClusterIdentifier(),
+      argoWorkflowsSetupStack.artifactsBucket().bucket().getBucketName(),
       setup.certificate().certificate().getCertificateArn());
 
     var argoWorkflows = Mapper.get()
@@ -76,16 +78,16 @@ public class ArgoWorkflowsNestedStack extends NestedStack {
     var templateMappings = new HashMap<String, Object>();
     templateMappings.put("region", common.region());
     templateMappings.put("domain", common.domain());
-    templateMappings.put("workflowNamespaces", setup.argoWorkflowsNamespaces().keySet());
-    templateMappings.put("argoServer.role.arn", setup.argoServerServiceAccount().roleConstruct().role().getRoleArn());
-    templateMappings.put("argoController.role.arn", setup.argoControllerServiceAccount().roleConstruct().role().getRoleArn());
-    templateMappings.put("workflowExecutor.role.arn", setup.argoExecutorServiceAccount().roleConstruct().role().getRoleArn());
-    templateMappings.put("artifactBucket", setup.argoWorkflowsArtifacts().bucket().getBucketName());
+    templateMappings.put("workflowNamespaces", argoWorkflowsSetupStack.teamNamespaces().keySet());
+    templateMappings.put("argoServer.role.arn", argoWorkflowsSetupStack.serverServiceAccount().roleConstruct().role().getRoleArn());
+    templateMappings.put("argoController.role.arn", argoWorkflowsSetupStack.controllerServiceAccount().roleConstruct().role().getRoleArn());
+    templateMappings.put("workflowExecutor.role.arn", argoWorkflowsSetupStack.executorServiceAccount().roleConstruct().role().getRoleArn());
+    templateMappings.put("artifactBucket", argoWorkflowsSetupStack.artifactsBucket().bucket().getBucketName());
 
     templateMappings.put("certificate.arn", setup.certificate().certificate().getCertificateArn());
-    templateMappings.put("argoWorkflows.db.host", setup.argoWorkflowsDb().cluster().getClusterEndpoint().getHostname());
-    templateMappings.put("argoWorkflows.db.secretArn", setup.argoWorkflowsDb().secretConstruct().secret().getSecretArn());
-    templateMappings.put("argoWorkflows.db.secretName", setup.argoWorkflowsDb().secretConstruct().secret().getSecretName());
+    templateMappings.put("argoWorkflows.db.host", argoWorkflowsSetupStack.database().cluster().getClusterEndpoint().getHostname());
+    templateMappings.put("argoWorkflows.db.secretArn", argoWorkflowsSetupStack.database().secretConstruct().secret().getSecretArn());
+    templateMappings.put("argoWorkflows.db.secretName", argoWorkflowsSetupStack.database().secretConstruct().secret().getSecretName());
     templateMappings.put("argoWorkflows.db.name", argoWorkflowsSetup.database().databaseName());
     templateMappings.put("argoWorkflows.ssoClientSecret", argocd.argoWorkflowsSsoClientSecret());
 

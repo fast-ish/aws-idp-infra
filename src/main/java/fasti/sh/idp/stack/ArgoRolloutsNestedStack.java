@@ -43,7 +43,7 @@ public class ArgoRolloutsNestedStack extends NestedStack {
    * @param common  shared deployment metadata
    * @param conf    IDP release configuration
    * @param cluster the EKS cluster to deploy to
-   * @param setup   pre-created resources (namespace, service accounts, certificate)
+   * @param setup   IDP setup (provides certificate and argoRollouts setup)
    * @param props   nested stack properties
    */
   @SneakyThrows

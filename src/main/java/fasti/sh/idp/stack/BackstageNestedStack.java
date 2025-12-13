@@ -20,7 +20,6 @@ import software.amazon.awscdk.services.eks.HelmChart;
 import software.amazon.awscdk.services.iam.IRole;
 import software.amazon.awscdk.services.s3.assets.Asset;
 import software.amazon.awscdk.services.s3.assets.AssetProps;
-import software.amazon.awscdk.services.secretsmanager.ISecret;
 import software.constructs.Construct;
 
 /**
@@ -47,7 +46,6 @@ import software.constructs.Construct;
 @Getter
 public class BackstageNestedStack extends NestedStack {
   private final RdsConstruct database;
-  private final ISecret githubOAuthSecret;
   private final IRole serviceAccountRole;
   private final ICertificate certificate;
   private final DockerImageConstruct dockerImage;
@@ -76,12 +74,12 @@ public class BackstageNestedStack extends NestedStack {
       .readValue(Template.parse(scope, conf.eks().addons()), AddonsConf.class)
       .backstage();
 
-    this.database = setup.backstageDb();
-
+    this.database = setup.backstage().database();
     this.certificate = setup.certificate().certificate();
-    this.githubOAuthSecret = setup.githubOAuthSecret();
-    this.serviceAccountRole = setup.backstageServiceAccountRole();
+    this.serviceAccountRole = setup.backstage().serviceAccountRole();
     this.dockerImage = new DockerImageConstruct(this, common, backstage.dockerImage());
+
+    var githubOAuthSecret = (String) this.getNode().getContext("deployment:github:oauth:backstage");
 
     var valuesYaml = Template
       .parse(
@@ -93,7 +91,7 @@ public class BackstageNestedStack extends NestedStack {
             "database.port", "5432",
             "database.secretArn", this.database.secretConstruct().secret().getSecretArn(),
             "database.secretName", this.database.secretConstruct().secret().getSecretName(),
-            "auth.github.awsSecretName", this.githubOAuthSecret.getSecretName(),
+            "auth.github.awsSecretName", githubOAuthSecret,
             "certificate.arn", this.certificate.getCertificateArn(),
             "image.uri", this.dockerImage.imageUri()));
 

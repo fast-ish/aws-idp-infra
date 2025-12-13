@@ -23,7 +23,7 @@ import software.constructs.Construct;
  *   <li>EKS - Kubernetes cluster</li>
  *   <li>Core Addons - Essential cluster add-ons (Karpenter, cert-manager, etc.)</li>
  *   <li>Observability Addons - Monitoring and logging (Grafana, Alloy)</li>
- *   <li>IDP Setup - Shared resources (certificates, databases, service accounts)</li>
+ *   <li>IDP Setup - Shared resources (certificates) and component setups</li>
  *   <li>Backstage - Developer portal</li>
  *   <li>ArgoCD - GitOps deployment</li>
  *   <li>Argo Workflows - Workflow automation</li>

@@ -40,7 +40,7 @@ public class ArgoEventsNestedStack extends NestedStack {
    * @param common  shared deployment metadata
    * @param conf    IDP release configuration
    * @param cluster the EKS cluster to deploy to
-   * @param setup   pre-created resources (namespace, service account)
+   * @param setup   IDP setup (provides argoEvents setup)
    * @param props   nested stack properties
    */
   @SneakyThrows

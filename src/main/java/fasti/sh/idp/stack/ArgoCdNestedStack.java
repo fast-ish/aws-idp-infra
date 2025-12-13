@@ -63,15 +63,15 @@ public class ArgoCdNestedStack extends NestedStack {
       .readValue(Template.parse(scope, conf.eks().addons()), AddonsConf.class)
       .argocd();
 
-    var githubOrg = (String) this.getNode().tryGetContext("deployment:github:org");
-    var githubOAuthSecret = (String) this.getNode().tryGetContext("deployment:github:oauth:argocd");
+    var githubOrg = (String) this.getNode().getContext("deployment:github:org");
+    var githubOAuthSecret = (String) this.getNode().getContext("deployment:github:oauth:argocd");
 
     var templateMappings = new HashMap<String, Object>();
-    templateMappings.put("repoServer.role.arn", setup.argoCdServiceAccount().roleConstruct().role().getRoleArn());
+    templateMappings.put("repoServer.role.arn", setup.argocd().serviceAccount().roleConstruct().role().getRoleArn());
     templateMappings.put("domain", common.domain());
     templateMappings.put("certificate.arn", setup.certificate().certificate().getCertificateArn());
-    templateMappings.put("github.org", githubOrg != null ? githubOrg : "");
-    templateMappings.put("github.oauthSecretName", githubOAuthSecret != null ? githubOAuthSecret : common.id() + "-argocd-github-oauth");
+    templateMappings.put("github.org", githubOrg);
+    templateMappings.put("github.oauthSecretName", githubOAuthSecret);
     templateMappings.put("argoWorkflows.ssoClientSecret", this.argoWorkflowsSsoClientSecret);
     templateMappings.put("argoRollouts.ssoClientSecret", this.argoRolloutsSsoClientSecret);
     templateMappings.put("alb.serviceAccountName", common.id() + "-aws-load-balancer-sa");
