@@ -34,6 +34,13 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
+Backstage labels (alias for common.labels)
+*/}}
+{{- define "backstage.labels" -}}
+{{ include "common.labels" . }}
+{{- end }}
+
+{{/*
 Selector labels
 */}}
 {{- define "backstage.selectorLabels" -}}

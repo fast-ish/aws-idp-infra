@@ -1,0 +1,71 @@
+controller:
+  replicas: 2
+
+  serviceAccount:
+    create: false
+    name: argo-rollouts-controller
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+  containerSecurityContext:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  extraArgs:
+    - --leader-elect
+
+dashboard:
+  enabled: true
+  replicas: 2
+
+  serviceAccount:
+    create: false
+    name: argo-rollouts-dashboard
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+  containerSecurityContext:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  ingress:
+    enabled: false
+
+installCRDs: true
+keepCRDs: true
+
+notifications:
+  enabled: false

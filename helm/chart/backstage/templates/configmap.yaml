@@ -31,6 +31,10 @@ data:
           user: ${POSTGRES_USER}
           password: ${POSTGRES_PASSWORD}
           database: {{ .Values.database.name }}
+          ssl:
+            rejectUnauthorized: true
+            ca:
+              $file: /etc/ssl/certs/rds-ca-bundle.pem
 
     auth:
       environment: {{ .Values.environment }}

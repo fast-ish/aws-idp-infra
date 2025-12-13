@@ -1,0 +1,159 @@
+platformId: {{platform:id}}
+deploymentId: {{deployment:id}}
+account: {{deployment:account}}
+region: {{deployment:region}}
+environment: {{deployment:environment}}
+name: backstage
+alias: {{deployment:team:alias}}
+build: {{deployment:version}}
+domain: {{deployment:domain}}
+organization: {{deployment:organization}}
+
+image:
+  uri: "{{image.uri}}"
+  pullPolicy: Always
+
+replicas: 1
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+
+labels:
+  "{{deployment:domain}}/account": "{{deployment:account}}"
+  "{{deployment:domain}}/region": "{{deployment:region}}"
+  "{{deployment:domain}}/stack": "{{deployment:team:name}}-{{deployment:environment}}"
+  "{{deployment:domain}}/resource-type": backstage
+  "{{deployment:domain}}/name": backstage
+  "{{deployment:domain}}/organization": "{{deployment:organization}}"
+  "{{deployment:domain}}/billing": "{{deployment:organization}}"
+
+annotations:
+  "k8s.grafana.com/scrape": "true"
+  "k8s.grafana.com/metrics.portNumber": "7007"
+
+securityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+  runAsGroup: 1000
+
+database:
+  host: "{{database.host}}"
+  port: "{{database.port}}"
+  name: backstage
+  secretName: {{deployment:id}}-backstage-db-credentials
+  awsSecretName: {{database.secretName}}
+
+auth:
+  github:
+    enabled: true
+    secretName: {{deployment:id}}-backstage-github-oauth
+    awsSecretName: {{auth.github.awsSecretName}}
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: "{{certificate.arn}}"
+    alb.ingress.kubernetes.io/healthcheck-path: /.backstage/health/v1/readiness
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+  hosts:
+    - host: {{deployment:domain}}
+      paths:
+        - path: /
+          pathType: Prefix
+
+node:
+  selector:
+    "karpenter.k8s.aws/instance-family": "t3a"
+  limits:
+    cpu: 50
+    memory: 100Gi
+  disruption:
+    consolidateAfter: 10m
+    consolidationPolicy: WhenEmpty
+  requirements:
+    - key: "karpenter.k8s.aws/instance-family"
+      operator: In
+      values:
+        - t3a
+        - t3
+    - key: "karpenter.sh/capacity-type"
+      operator: In
+      values:
+        - on-demand
+        - spot
+    - key: "kubernetes.io/arch"
+      operator: In
+      values:
+        - amd64
+
+serviceAccount:
+  create: true
+  name: {{deployment:id}}-backstage-sa
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::{{deployment:account}}:role/{{deployment:id}}-backstage-sa-role
+
+env:
+  - name: POSTGRES_HOST
+    valueFrom:
+      secretKeyRef:
+        name: {{deployment:id}}-backstage-db-credentials
+        key: host
+  - name: POSTGRES_PORT
+    value: "5432"
+  - name: POSTGRES_USER
+    valueFrom:
+      secretKeyRef:
+        name: {{deployment:id}}-backstage-db-credentials
+        key: username
+  - name: POSTGRES_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: {{deployment:id}}-backstage-db-credentials
+        key: password
+  - name: AUTH_GITHUB_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: {{deployment:id}}-backstage-github-oauth
+        key: client_id
+  - name: AUTH_GITHUB_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: {{deployment:id}}-backstage-github-oauth
+        key: client_secret
+  - name: APP_CONFIG_backend_database_connection_host
+    valueFrom:
+      secretKeyRef:
+        name: {{deployment:id}}-backstage-db-credentials
+        key: host
+  - name: APP_CONFIG_backend_database_connection_user
+    valueFrom:
+      secretKeyRef:
+        name: {{deployment:id}}-backstage-db-credentials
+        key: username
+  - name: APP_CONFIG_backend_database_connection_password
+    valueFrom:
+      secretKeyRef:
+        name: {{deployment:id}}-backstage-db-credentials
+        key: password
+
+catalog:
+  locations:
+    - type: url
+      target: https://github.com/fast-ish/aws-idp-gitops/blob/main/platform/backstage/templates-location.yaml
+    - type: url
+      target: https://github.com/fast-ish/aws-idp-gitops/blob/main/teams/*/team.yaml
+      rules:
+        - allow: [Group]

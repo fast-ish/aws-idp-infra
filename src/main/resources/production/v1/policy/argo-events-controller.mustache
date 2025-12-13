@@ -1,0 +1,29 @@
+[
+  {
+    "Effect": "Allow",
+    "Action": [
+      "sqs:ReceiveMessage",
+      "sqs:DeleteMessage",
+      "sqs:GetQueueAttributes",
+      "sqs:GetQueueUrl"
+    ],
+    "Resource": ["arn:aws:sqs:{{region}}:{{account}}:*"]
+  },
+  {
+    "Effect": "Allow",
+    "Action": [
+      "sns:Subscribe",
+      "sns:Unsubscribe",
+      "sns:GetTopicAttributes"
+    ],
+    "Resource": ["arn:aws:sns:{{region}}:{{account}}:*"]
+  },
+  {
+    "Effect": "Allow",
+    "Action": [
+      "s3:GetBucketNotification",
+      "s3:PutBucketNotification"
+    ],
+    "Resource": ["arn:aws:s3:::*"]
+  }
+]

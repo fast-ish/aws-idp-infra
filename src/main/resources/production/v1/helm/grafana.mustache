@@ -1,6 +1,18 @@
 cluster:
   name: "{{deployment:id}}-eks"
 
+global:
+  scrapeInterval: 60s
+  scrapeTimeout: 10s
+  maxCacheSize: 100000
+  platform: ""
+
+externalLabels:
+  cluster: "{{deployment:id}}-eks"
+  environment: production
+  region: "{{deployment:region}}"
+  platform: eks
+
 destinations:
   - name: grafana-cloud-metrics
     type: prometheus
@@ -9,6 +21,8 @@ destinations:
       type: basic
       username: "{{deployment:eks:grafana:prometheusUsername}}"
       password: {{deployment:eks:grafana:key}}
+    writeRelabelConfigs: []
+
   - name: grafana-cloud-logs
     type: loki
     url: {{deployment:eks:grafana:lokiHost}}/loki/api/v1/push
@@ -16,6 +30,8 @@ destinations:
       type: basic
       username: "{{deployment:eks:grafana:lokiUsername}}"
       password: {{deployment:eks:grafana:key}}
+    tenantId: ""
+
   - name: grafana-cloud-traces
     type: otlp
     url: {{deployment:eks:grafana:tempoHost}}
@@ -30,6 +46,7 @@ destinations:
       enabled: false
     traces:
       enabled: true
+
   - name: grafana-cloud-profiles
     type: pyroscope
     url: {{deployment:eks:grafana:pyroscopeHost}}
@@ -40,36 +57,124 @@ destinations:
 
 clusterMetrics:
   enabled: true
+  destinations:
+    - grafana-cloud-metrics
+
+  kubelet:
+    enabled: true
+
+  cadvisor:
+    enabled: true
+
+  apiServer:
+    enabled: true
+
+  kubeStateMetrics:
+    enabled: true
+    deploy: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    metricLabelsAllowlist:
+      - pods=[app.kubernetes.io/name,app.kubernetes.io/component,app.kubernetes.io/part-of,team]
+      - deployments=[app.kubernetes.io/name,app.kubernetes.io/component]
+      - namespaces=[team,cost-center]
+
+  nodeExporter:
+    enabled: true
+    deploy: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+  windowsExporter:
+    enabled: false
+
   opencost:
     enabled: true
     metricsSource: grafana-cloud-metrics
     opencost:
       exporter:
         defaultClusterId: "{{deployment:id}}-eks"
+        aws:
+          spot_data_region: "{{deployment:region}}"
+          spot_data_bucket: ""
+          spot_data_prefix: ""
+          spot_refresh_rate: 3600
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
       prometheus:
         existingSecretName: grafana-cloud-metrics-k8s-monitoring
+        username: "{{deployment:eks:grafana:prometheusUsername}}"
+        password: {{deployment:eks:grafana:key}}
         external:
           url: {{deployment:eks:grafana:prometheusHost}}/api/prom
+      ui:
+        enabled: false
+
   kepler:
     enabled: true
 
-annotationAutodiscovery:
+podLogs:
   enabled: true
-
-prometheusOperatorObjects:
-  enabled: true
-
-clusterEvents:
-  enabled: true
+  destinations:
+    - grafana-cloud-logs
+  labelsToKeep:
+    - app
+    - component
+    - namespace
+    - pod
+    - container
+    - team
+  structuredMetadata:
+    pod: pod
+    container: container
+    namespace: namespace
+  gatherMethod: volumes
+  annotations:
+    scrape: "grafana.com/logs.scrape"
+    job: "grafana.com/logs.job"
 
 nodeLogs:
   enabled: true
+  destinations:
+    - grafana-cloud-logs
+  journal:
+    enabled: true
+    units:
+      - kubelet.service
+      - containerd.service
+      - docker.service
 
-podLogs:
+clusterEvents:
   enabled: true
+  destinations:
+    - grafana-cloud-logs
+  eventTypes:
+    - Warning
+    - Normal
+  namespaces: []
 
 applicationObservability:
   enabled: true
+  destinations:
+    - grafana-cloud-traces
+    - grafana-cloud-metrics
+    - grafana-cloud-logs
+
   receivers:
     otlp:
       grpc:
@@ -81,19 +186,152 @@ applicationObservability:
     zipkin:
       enabled: true
       port: 9411
+    jaeger:
+      grpc:
+        enabled: true
+        port: 14250
+      thriftHttp:
+        enabled: true
+        port: 14268
+
+  tailSampling:
+    enabled: true
+    policies:
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes:
+            - ERROR
+      - name: slow-requests
+        type: latency
+        latency:
+          threshold_ms: 2000
+      - name: probabilistic
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
+
   connectors:
     grafanaCloudMetrics:
       enabled: true
+    spanMetrics:
+      enabled: true
+      dimensions:
+        - name: "service.name"
+        - name: "service.namespace"
+        - name: "http.method"
+        - name: "http.status_code"
+
+beyla:
+  enabled: true
+  config:
+    discovery:
+      services:
+        - name: ".*"
+          namespace: "team-.*"
+    metrics:
+      enabled: true
+      port: 9090
+    traces:
+      enabled: true
+    network:
+      enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+frontendObservability:
+  enabled: true
+  receiver:
+    enabled: true
+    port: 12347
+  cors:
+    allowedOrigins:
+      - "https://*.{{deployment:domain}}"
+      - "https://backstage.internal"
+    allowedHeaders:
+      - "Content-Type"
+      - "X-Faro-Session-Id"
 
 autoInstrumentation:
   enabled: true
+  java:
+    enabled: true
+  nodejs:
+    enabled: true
+  python:
+    enabled: true
+  dotnet:
+    enabled: true
+  go:
+    enabled: true
 
 profiling:
   enabled: true
+  destinations:
+    - grafana-cloud-profiles
+  ebpf:
+    enabled: true
+
+integrations:
+  destinations:
+    - grafana-cloud-metrics
+
+  certManager:
+    enabled: true
+
+  etcd:
+    enabled: false
+
+  mysql:
+    enabled: false
+
+  postgres:
+    enabled: false
+
+  redis:
+    enabled: false
+
+prometheusOperatorObjects:
+  enabled: true
+  serviceMonitors:
+    enabled: true
+    selector: {}
+  podMonitors:
+    enabled: true
+    selector: {}
+  rules:
+    enabled: true
+    selector: {}
+
+annotationAutodiscovery:
+  enabled: true
+  annotations:
+    scrape: "prometheus.io/scrape"
+    port: "prometheus.io/port"
+    path: "prometheus.io/path"
+    scheme: "prometheus.io/scheme"
+
+selfReporting:
+  enabled: true
+  scrapeInterval: 60s
 
 alloy-metrics:
   enabled: true
   alloy:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    clustering:
+      enabled: true
     extraEnv:
       - name: GCLOUD_RW_API_KEY
         value: {{deployment:eks:grafana:key}}
@@ -113,6 +351,13 @@ alloy-metrics:
 alloy-singleton:
   enabled: true
   alloy:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
     extraEnv:
       - name: GCLOUD_RW_API_KEY
         value: {{deployment:eks:grafana:key}}
@@ -132,6 +377,16 @@ alloy-singleton:
 alloy-logs:
   enabled: true
   alloy:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    mounts:
+      varlog: true
+      dockercontainers: true
     extraEnv:
       - name: GCLOUD_RW_API_KEY
         value: {{deployment:eks:grafana:key}}
@@ -155,6 +410,13 @@ alloy-logs:
 alloy-receiver:
   enabled: true
   alloy:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
     extraPorts:
       - name: otlp-grpc
         port: 4317
@@ -167,6 +429,18 @@ alloy-receiver:
       - name: zipkin
         port: 9411
         targetPort: 9411
+        protocol: TCP
+      - name: jaeger-grpc
+        port: 14250
+        targetPort: 14250
+        protocol: TCP
+      - name: jaeger-http
+        port: 14268
+        targetPort: 14268
+        protocol: TCP
+      - name: faro
+        port: 12347
+        targetPort: 12347
         protocol: TCP
     extraEnv:
       - name: GCLOUD_RW_API_KEY
@@ -191,6 +465,15 @@ alloy-receiver:
 alloy-profiles:
   enabled: true
   alloy:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    securityContext:
+      privileged: true
     extraEnv:
       - name: GCLOUD_RW_API_KEY
         value: {{deployment:eks:grafana:key}}
@@ -210,3 +493,16 @@ alloy-profiles:
             fieldPath: spec.nodeName
       - name: GCLOUD_FM_COLLECTOR_ID
         value: grafana-k8s-monitoring-$(CLUSTER_NAME)-$(NAMESPACE)-alloy-profiles-$(NODE_NAME)
+
+alloy-operator:
+  deploy: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+prometheus-operator-crds:
+  enabled: true

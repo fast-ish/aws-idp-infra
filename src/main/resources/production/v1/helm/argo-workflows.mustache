@@ -1,14 +1,36 @@
 server:
   replicas: 2
+  servicePort: 2746
+
   serviceAccount:
-    create: true
+    create: false
     name: argo-server
-    annotations:
-      eks.amazonaws.com/role-arn: "{{argoServer.role.arn}}"
+
+  authModes:
+    - sso
+
+  sso:
+    enabled: true
+    issuer: https://argocd.{{domain}}/api/dex
+    clientId:
+      name: argo-workflows-sso
+      key: client-id
+    clientSecret:
+      name: argo-workflows-sso
+      key: client-secret
+    redirectUrl: https://workflows.{{domain}}/oauth2/callback
+    rbac:
+      enabled: false
+    scopes:
+      - openid
+      - profile
+      - email
+      - groups
+    customGroupClaimName: groups
 
   extraArgs:
-    - --auth-mode=server
     - --secure=false
+    - --access-control-allow-origin=https://{{domain}}
 
   ingress:
     enabled: true
@@ -20,10 +42,14 @@ server:
       alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
       alb.ingress.kubernetes.io/ssl-redirect: "443"
       alb.ingress.kubernetes.io/healthcheck-path: /
-      alb.ingress.kubernetes.io/success-codes: 200-399
+      alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+      alb.ingress.kubernetes.io/backend-protocol: HTTP
       alb.ingress.kubernetes.io/group.name: argo
     hosts:
       - workflows.{{domain}}
+    paths:
+      - /
+    pathType: Prefix
 
   resources:
     requests:
@@ -37,17 +63,25 @@ server:
     enabled: true
     minAvailable: 1
 
+  securityContext:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
 controller:
   replicas: 2
+
   serviceAccount:
-    create: true
+    create: false
     name: argo-workflow-controller
-    annotations:
-      eks.amazonaws.com/role-arn: "{{argoController.role.arn}}"
 
   workflowNamespaces:
-    - argo
-    - default
+{{#workflowNamespaces}}
+    - {{.}}
+{{/workflowNamespaces}}
 
   workflowDefaults:
     spec:
@@ -59,14 +93,44 @@ controller:
       podGC:
         strategy: OnWorkflowSuccess
         deleteDelayDuration: 5m
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 1000
+      retryStrategy:
+        limit: 2
+        retryPolicy: "OnError"
+        backoff:
+          duration: "10s"
+          factor: 2
+          maxDuration: "1m"
+      podMetadata:
+        labels:
+          app.kubernetes.io/managed-by: argo-workflows
+        annotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "9090"
 
   persistence:
-    archive: false
+    archive: true
+    postgresql:
+      host: "{{argoWorkflows.db.host}}"
+      port: 5432
+      database: "{{argoWorkflows.db.name}}"
+      tableName: argo_workflows
+      ssl: true
+      sslMode: require
+      userNameSecret:
+        name: "argo-workflows-db-credentials"
+        key: username
+      passwordSecret:
+        name: "argo-workflows-db-credentials"
+        key: password
 
   metricsConfig:
     enabled: true
     port: 9090
     path: /metrics
+    metricsTTL: 10m
 
   resources:
     requests:
@@ -77,11 +141,25 @@ controller:
       memory: 1Gi
 
   extraArgs:
-    - --leader-elect
+    - --executor-image-pull-policy=IfNotPresent
 
   pdb:
     enabled: true
     minAvailable: 1
+
+  securityContext:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  parallelism: 20
+  namespaceParallelism: 10
+  resourceRateLimit:
+    limit: 10
+    burst: 5
 
 artifactRepository:
   archiveLogs: true
@@ -91,14 +169,12 @@ artifactRepository:
     endpoint: s3.{{region}}.amazonaws.com
     useSDKCreds: true
     insecure: false
-    keyFormat: "artifacts/{{`{{workflow.namespace}}`}}/{{`{{workflow.name}}`}}/{{`{{pod.name}}`}}"
+    keyFormat: "artifacts/{{`{{workflow.namespace}}`}}/{{`{{workflow.creationTimestamp.Y}}`}}/{{`{{workflow.creationTimestamp.m}}`}}/{{`{{workflow.name}}`}}/{{`{{pod.name}}`}}"
 
 workflow:
   serviceAccount:
-    create: true
+    create: false
     name: argo-workflow
-    annotations:
-      eks.amazonaws.com/role-arn: "{{workflowExecutor.role.arn}}"
   rbac:
     create: true
 
@@ -108,9 +184,70 @@ executor:
       cpu: 10m
       memory: 64Mi
     limits:
-      cpu: 100m
+      cpu: 500m
       memory: 256Mi
+  securityContext:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: false
+    allowPrivilegeEscalation: false
+
+mainContainer:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  securityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
 
 useStaticCredentials: false
 singleNamespace: false
 createAggregateRoles: true
+
+images:
+  pullPolicy: IfNotPresent
+
+priorityClassName: system-cluster-critical
+
+extraObjects:
+  - apiVersion: external-secrets.io/v1
+    kind: ExternalSecret
+    metadata:
+      name: argo-workflows-db-credentials
+      namespace: argo
+      labels:
+        app.kubernetes.io/managed-by: argo-workflows
+    spec:
+      refreshInterval: 1h
+      secretStoreRef:
+        name: aws-secrets-manager
+        kind: ClusterSecretStore
+      target:
+        name: argo-workflows-db-credentials
+        creationPolicy: Owner
+      data:
+        - secretKey: username
+          remoteRef:
+            key: {{argoWorkflows.db.secretName}}
+            property: username
+        - secretKey: password
+          remoteRef:
+            key: {{argoWorkflows.db.secretName}}
+            property: password
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: argo-workflows-sso
+      namespace: argo
+      labels:
+        app.kubernetes.io/managed-by: argo-workflows
+    type: Opaque
+    stringData:
+      client-id: argo-workflows
+      client-secret: "{{argoWorkflows.ssoClientSecret}}"

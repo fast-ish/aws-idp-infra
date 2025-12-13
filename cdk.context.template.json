@@ -19,6 +19,14 @@
   "deployment:version": "v1",
   "deployment:domain": "backstage.example.com",
 
+  "deployment:email:ops": "ops@example.com",
+  "deployment:email:dev": "dev@example.com",
+  "deployment:email:oncall": "oncall@example.com",
+
+  "deployment:github:org": "my-github-org",
+  "deployment:github:oauth:backstage": "myorg-backstage-github-oauth",
+  "deployment:github:oauth:argocd": "myorg-argocd-github-oauth",
+
   "deployment:eks:grafana:secret": "myorg-grafana",
 
   "deployment:eks:administrators": [

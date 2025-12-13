@@ -4,10 +4,10 @@ import static fasti.sh.execute.serialization.Format.describe;
 import static fasti.sh.execute.serialization.Format.name;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import fasti.sh.idp.stack.IdpReleaseConf;
-import fasti.sh.idp.stack.IdpStack;
 import fasti.sh.execute.serialization.Mapper;
 import fasti.sh.execute.serialization.Template;
+import fasti.sh.idp.model.IdpReleaseConf;
+import fasti.sh.idp.stack.IdpStack;
 import fasti.sh.model.main.Common;
 import fasti.sh.model.main.Release;
 import java.util.ArrayList;
@@ -21,14 +21,16 @@ import software.amazon.awscdk.StackProps;
 
 /**
  * CDK application entry point for IDP infrastructure deployment.
+ *
+ * <p>
+ * Creates a single stack with nested stacks for all IDP components. Deploy with {@code cdk deploy --all}.
  */
 public class Launch {
 
   /**
    * Main entry point for the CDK application.
    *
-   * @param args
-   *          command line arguments
+   * @param args command line arguments
    */
   public static void main(final String[] args) {
     var app = new App();
@@ -41,19 +43,17 @@ public class Launch {
         .builder()
         .stackName(name(conf.release().common().id(), "idp"))
         .env(
-          Environment
-            .builder()
+          Environment.builder()
             .account(conf.release().common().account())
             .region(conf.release().common().region())
             .build())
         .description(
           describe(
             conf.platform(),
-            String
-              .format(
-                "Internal Developer Platform release [%s/%s]",
-                conf.release().common().name(),
-                conf.release().common().alias())))
+            String.format(
+              "Internal Developer Platform release [%s/%s]",
+              conf.release().common().name(),
+              conf.release().common().alias())))
         .tags(Common.Maps.from(conf.platform().tags(), conf.release().common().tags()))
         .build());
 
@@ -62,8 +62,7 @@ public class Launch {
 
   @SneakyThrows
   private static Release<IdpReleaseConf> get(App app) {
-    var parsed = Template
-      .parse(
+    var parsed = Template.parse(
         app,
         "conf.mustache",
         Map.ofEntries(Map.entry("deployment:tags", tags(app))));

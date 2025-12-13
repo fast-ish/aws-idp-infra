@@ -105,19 +105,71 @@ aws secretsmanager create-secret \
 
 See: [Grafana Cloud Kubernetes Monitoring](https://grafana.com/docs/grafana-cloud/monitor-infrastructure/kubernetes-monitoring/)
 
-## Step 4: Create GitHub OAuth Application
+## Step 4: Create GitHub OAuth Applications
+
+You need **two** GitHub OAuth apps - one for Backstage and one for ArgoCD (which also provides SSO for Argo Workflows).
+
+### 4a. Backstage OAuth App
 
 1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
 2. Click **New OAuth App**
 3. Fill in:
    - **Application name**: `Backstage`
-   - **Homepage URL**: `https://backstage.YOUR_DOMAIN`
-   - **Authorization callback URL**: `https://backstage.YOUR_DOMAIN/api/auth/github/handler/frame`
+   - **Homepage URL**: `https://YOUR_DOMAIN`
+   - **Authorization callback URL**: `https://YOUR_DOMAIN/api/auth/github/handler/frame`
 4. Click **Register application**
 5. Note the **Client ID**
 6. Click **Generate a new client secret** and note the **Client Secret**
 
-Save these credentials - you'll need them after deployment.
+Create the AWS secret:
+```bash
+aws secretsmanager create-secret \
+  --name <deployment:id>-backstage-github-oauth \
+  --description "GitHub OAuth credentials for Backstage" \
+  --secret-string '{
+    "client_id": "YOUR_BACKSTAGE_CLIENT_ID",
+    "client_secret": "YOUR_BACKSTAGE_CLIENT_SECRET"
+  }' \
+  --region <region>
+```
+
+### 4b. ArgoCD OAuth App
+
+1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
+2. Click **New OAuth App**
+3. Fill in:
+   - **Application name**: `ArgoCD`
+   - **Homepage URL**: `https://argocd.YOUR_DOMAIN`
+   - **Authorization callback URL**: `https://argocd.YOUR_DOMAIN/api/dex/callback`
+4. Click **Register application**
+5. Note the **Client ID**
+6. Click **Generate a new client secret** and note the **Client Secret**
+
+Generate a server secret key (ArgoCD uses this internally for session encryption):
+```bash
+openssl rand -base64 32
+```
+
+Create the AWS secret:
+```bash
+aws secretsmanager create-secret \
+  --name <deployment:id>-argocd-github-oauth \
+  --description "GitHub OAuth credentials for ArgoCD" \
+  --secret-string '{
+    "client_id": "YOUR_ARGOCD_CLIENT_ID",
+    "client_secret": "YOUR_ARGOCD_CLIENT_SECRET",
+    "server_secretkey": "YOUR_GENERATED_SECRET_KEY"
+  }' \
+  --region <region>
+```
+
+| Field | Description |
+|-------|-------------|
+| `client_id` | GitHub OAuth Client ID |
+| `client_secret` | GitHub OAuth Client Secret |
+| `server_secretkey` | Random string for ArgoCD session encryption (output of `openssl rand -base64 32`) |
+
+**Note**: Argo Workflows uses ArgoCD's Dex as its OIDC provider, so it shares ArgoCD's OAuth app.
 
 ## Step 5: Configure cdk.context.json
 
@@ -142,6 +194,9 @@ cp cdk.context.template.json cdk.context.json
 | `deployment:team:name` | Team name | `platform` |
 | `deployment:team:alias` | Team alias | `backstage` |
 | `deployment:domain` | Backstage domain | `backstage.example.com` |
+| `deployment:github:org` | GitHub organization name | `my-github-org` |
+| `deployment:github:oauth:backstage` | Backstage OAuth secret name | `myorg-backstage-github-oauth` |
+| `deployment:github:oauth:argocd` | ArgoCD OAuth secret name | `myorg-argocd-github-oauth` |
 | `deployment:eks:grafana:secret` | Grafana secret name | `your-org-grafana` |
 
 ### Cluster Access
@@ -182,8 +237,9 @@ Review output for errors before proceeding.
 - [ ] cdk-common built (`mvn clean install -DskipTests`)
 - [ ] CDK bootstrapped in target account/region
 - [ ] Grafana Cloud secret created in AWS Secrets Manager
-- [ ] GitHub OAuth application created (credentials saved)
-- [ ] `cdk.context.json` configured
+- [ ] Backstage GitHub OAuth app created and secret stored in AWS Secrets Manager
+- [ ] ArgoCD GitHub OAuth app created and secret stored in AWS Secrets Manager
+- [ ] `cdk.context.json` configured (including `deployment:github:org` and OAuth secret names)
 - [ ] `cdk synth` runs without errors
 
 ## Deploy

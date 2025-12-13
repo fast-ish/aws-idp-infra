@@ -1,13 +1,14 @@
-provider: aws
+provider:
+  name: aws
 
 aws:
   region: {{deployment:region}}
 
-txtOwnerId: {{txtOwnerId}}
+txtOwnerId: {{deployment:dns:txtOwnerId}}
 domainFilters:
-{{#domainFilters}}
+{{#deployment:dns:domainFilters}}
   - {{.}}
-{{/domainFilters}}
+{{/deployment:dns:domainFilters}}
 
 policy: sync
 
@@ -26,3 +27,6 @@ resources:
 podDisruptionBudget:
   enabled: true
   minAvailable: 1
+
+nodeSelector:
+  "eks.amazonaws.com/nodegroup": {{deployment:id}}-core-node

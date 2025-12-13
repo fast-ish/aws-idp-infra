@@ -1,11 +1,10 @@
-
 ---
 topics:
   eks-critical-alarms:
-    - ops-team@example.com
-    - sre-oncall@example.com
+    - {{deployment:email:ops}}
+    - {{deployment:email:oncall}}
   eks-warning-alarms:
-    - dev-team@example.com
+    - {{deployment:email:dev}}
 
 metrics:
   - filterName: KubeAPIServerErrors

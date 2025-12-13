@@ -5,15 +5,16 @@ metadata:
   labels:
     {{- include "common.labels" . | nindent 4 }}
 spec:
-  role: {{ .Values.deploymentId }}-eks-node-role
+  role: {{ .Values.deploymentId }}-core-node
   amiSelectorTerms:
     - alias: bottlerocket@latest
   subnetSelectorTerms:
     - tags:
         karpenter.sh/discovery: {{ .Values.deploymentId }}-vpc
+        "{{ .Values.domain }}:type": private_with_egress
   securityGroupSelectorTerms:
     - tags:
-        karpenter.sh/discovery: {{ .Values.deploymentId }}-vpc
+        "aws:eks:cluster-name": "{{ .Values.deploymentId }}-eks"
   blockDeviceMappings:
     - deviceName: /dev/xvda
       ebs:
