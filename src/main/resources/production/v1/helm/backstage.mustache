@@ -69,7 +69,7 @@ ingress:
     alb.ingress.kubernetes.io/healthy-threshold-count: "2"
     alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
   hosts:
-    - host: {{deployment:domain}}
+    - host: backstage.{{deployment:domain}}
       paths:
         - path: /
           pathType: Prefix

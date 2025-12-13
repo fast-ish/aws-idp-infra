@@ -4,13 +4,14 @@ set -euo pipefail
 # =============================================================================
 # IDP Post-Deployment Script
 # Run this after `cdk deploy` completes successfully
+#
+# DNS is managed automatically by ExternalDNS - no manual configuration needed
 # =============================================================================
 
-# Configuration - update these values
-DEPLOYMENT_ID="${DEPLOYMENT_ID:-seagulls}"
+# Configuration - update these values or set as environment variables
+DEPLOYMENT_ID="${DEPLOYMENT_ID:-smash}"
 REGION="${AWS_REGION:-us-west-2}"
-DOMAIN="${DOMAIN:-backstage.stxkxs.io}"
-HOSTED_ZONE_ID="${HOSTED_ZONE_ID:-}"  # Optional: for automatic DNS setup
+DOMAIN="${DOMAIN:-devops.stxkxs.io}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -60,6 +61,11 @@ wait_for_components() {
     kubectl wait --for=condition=available deployment/external-secrets \
         -n external-secrets --timeout=300s 2>/dev/null || true
 
+    # Wait for ExternalDNS
+    log_info "Waiting for ExternalDNS..."
+    kubectl wait --for=condition=available deployment/external-dns \
+        -n external-dns --timeout=300s 2>/dev/null || true
+
     # Wait for Backstage
     log_info "Waiting for Backstage..."
     kubectl wait --for=condition=available deployment \
@@ -79,10 +85,10 @@ wait_for_components() {
 }
 
 # -----------------------------------------------------------------------------
-# Step 3: Get ALB addresses
+# Step 3: Get ingress status
 # -----------------------------------------------------------------------------
-get_alb_addresses() {
-    log_info "Retrieving ALB addresses..."
+get_ingress_status() {
+    log_info "Retrieving ingress status..."
 
     echo ""
     echo "=========================================="
@@ -91,134 +97,15 @@ get_alb_addresses() {
     kubectl get ingress -A
     echo ""
 
-    # Extract ALB addresses
-    BACKSTAGE_ALB=$(kubectl get ingress -n backstage -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
-    ARGO_ALB=$(kubectl get ingress -n argo -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
-
-    if [[ -n "$BACKSTAGE_ALB" ]]; then
-        log_success "Backstage ALB: $BACKSTAGE_ALB"
-    else
-        log_warn "Backstage ALB not ready yet"
-    fi
-
-    if [[ -n "$ARGO_ALB" ]]; then
-        log_success "Argo ALB: $ARGO_ALB"
-    else
-        log_warn "Argo ALB not ready yet"
-    fi
+    # Check if ExternalDNS has created the records
+    log_info "DNS records are managed by ExternalDNS automatically"
+    log_info "Checking ExternalDNS logs for recent activity..."
+    kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=5 2>/dev/null || true
+    echo ""
 }
 
 # -----------------------------------------------------------------------------
-# Step 4: Configure DNS (Route53)
-# -----------------------------------------------------------------------------
-
-# ALB hosted zone IDs by region (these are AWS-managed and static)
-# https://docs.aws.amazon.com/general/latest/gr/elb.html
-declare -A ALB_ZONE_IDS=(
-    ["us-east-1"]="Z35SXDOTRQ7X7K"
-    ["us-east-2"]="Z3AADJGX6KTTL2"
-    ["us-west-1"]="Z368ELLRRE2KJ0"
-    ["us-west-2"]="Z1H1FL5HABSF5"
-    ["eu-west-1"]="Z32O12XQLNTSW2"
-    ["eu-west-2"]="ZHURV8PSTC4K8"
-    ["eu-west-3"]="Z3Q77PNBQS71R4"
-    ["eu-central-1"]="Z215JYRZR1TBD5"
-    ["ap-northeast-1"]="Z14GRHDCWA56QT"
-    ["ap-northeast-2"]="ZWKZPGTI48KDX"
-    ["ap-southeast-1"]="Z1LMS91P8CMLE5"
-    ["ap-southeast-2"]="Z1GM3OXH4ZPM65"
-    ["ap-south-1"]="ZP97RAFLXTNZK"
-    ["sa-east-1"]="Z2P70J7HTTTPLU"
-    ["ca-central-1"]="ZQSVJUPU6J1EY"
-)
-
-configure_dns() {
-    if [[ -z "$HOSTED_ZONE_ID" ]]; then
-        log_warn "HOSTED_ZONE_ID not set - skipping automatic DNS configuration"
-        log_info "Please manually create A records in your DNS provider:"
-        echo ""
-        echo "  ${DOMAIN}              -> ${BACKSTAGE_ALB:-<backstage-alb>}"
-        echo "  argocd.${DOMAIN}       -> ${ARGO_ALB:-<argo-alb>}"
-        echo "  workflows.${DOMAIN}    -> ${ARGO_ALB:-<argo-alb>}"
-        echo ""
-        return
-    fi
-
-    log_info "Configuring Route53 DNS records..."
-
-    # Get ALB hosted zone ID for this region
-    ALB_ZONE="${ALB_ZONE_IDS[$REGION]:-}"
-    if [[ -z "$ALB_ZONE" ]]; then
-        log_error "Unknown region: $REGION - cannot determine ALB hosted zone ID"
-        log_info "Please manually create DNS records"
-        return
-    fi
-
-    log_info "Using ALB hosted zone ID: $ALB_ZONE (for region $REGION)"
-
-    # Create backstage A record (root domain)
-    if [[ -n "$BACKSTAGE_ALB" ]]; then
-        aws route53 change-resource-record-sets \
-            --hosted-zone-id "$HOSTED_ZONE_ID" \
-            --change-batch "{
-                \"Changes\": [{
-                    \"Action\": \"UPSERT\",
-                    \"ResourceRecordSet\": {
-                        \"Name\": \"${DOMAIN}\",
-                        \"Type\": \"A\",
-                        \"AliasTarget\": {
-                            \"HostedZoneId\": \"${ALB_ZONE}\",
-                            \"DNSName\": \"dualstack.${BACKSTAGE_ALB}\",
-                            \"EvaluateTargetHealth\": true
-                        }
-                    }
-                }]
-            }" --region "$REGION" >/dev/null
-        log_success "Created A record: ${DOMAIN}"
-    fi
-
-    # Create argocd and workflows A records
-    if [[ -n "$ARGO_ALB" ]]; then
-        aws route53 change-resource-record-sets \
-            --hosted-zone-id "$HOSTED_ZONE_ID" \
-            --change-batch "{
-                \"Changes\": [{
-                    \"Action\": \"UPSERT\",
-                    \"ResourceRecordSet\": {
-                        \"Name\": \"argocd.${DOMAIN}\",
-                        \"Type\": \"A\",
-                        \"AliasTarget\": {
-                            \"HostedZoneId\": \"${ALB_ZONE}\",
-                            \"DNSName\": \"dualstack.${ARGO_ALB}\",
-                            \"EvaluateTargetHealth\": true
-                        }
-                    }
-                }]
-            }" --region "$REGION" >/dev/null
-        log_success "Created A record: argocd.${DOMAIN}"
-
-        aws route53 change-resource-record-sets \
-            --hosted-zone-id "$HOSTED_ZONE_ID" \
-            --change-batch "{
-                \"Changes\": [{
-                    \"Action\": \"UPSERT\",
-                    \"ResourceRecordSet\": {
-                        \"Name\": \"workflows.${DOMAIN}\",
-                        \"Type\": \"A\",
-                        \"AliasTarget\": {
-                            \"HostedZoneId\": \"${ALB_ZONE}\",
-                            \"DNSName\": \"dualstack.${ARGO_ALB}\",
-                            \"EvaluateTargetHealth\": true
-                        }
-                    }
-                }]
-            }" --region "$REGION" >/dev/null
-        log_success "Created A record: workflows.${DOMAIN}"
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# Step 5: Display access information
+# Step 4: Display access information
 # -----------------------------------------------------------------------------
 display_access_info() {
     echo ""
@@ -229,22 +116,26 @@ display_access_info() {
 
     # Backstage
     echo -e "${GREEN}Backstage (Developer Portal)${NC}"
-    echo "  URL: https://${DOMAIN}"
+    echo "  URL: https://backstage.${DOMAIN}"
     echo "  Auth: GitHub OAuth"
     echo ""
 
     # ArgoCD
     echo -e "${GREEN}Argo CD (GitOps)${NC}"
     echo "  URL: https://argocd.${DOMAIN}"
-    echo "  Username: admin"
-    ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d || echo "<not available>")
-    echo "  Password: ${ARGOCD_PASSWORD}"
+    echo "  Auth: GitHub OAuth (via Dex)"
     echo ""
 
     # Argo Workflows
     echo -e "${GREEN}Argo Workflows${NC}"
     echo "  URL: https://workflows.${DOMAIN}"
-    echo "  Auth: Server mode (no login required)"
+    echo "  Auth: ArgoCD SSO"
+    echo ""
+
+    # Argo Rollouts
+    echo -e "${GREEN}Argo Rollouts Dashboard${NC}"
+    echo "  URL: https://rollouts.${DOMAIN}"
+    echo "  Auth: ArgoCD SSO"
     echo ""
 
     echo "=========================================="
@@ -252,28 +143,19 @@ display_access_info() {
 }
 
 # -----------------------------------------------------------------------------
-# Step 6: Run health checks
+# Step 5: Run health checks
 # -----------------------------------------------------------------------------
 run_health_checks() {
     log_info "Running health checks..."
 
     echo ""
-    echo "Pod Status:"
-    echo "-----------"
-    kubectl get pods -n backstage
-    echo ""
-    kubectl get pods -n argocd
-    echo ""
-    kubectl get pods -n argo
-    echo ""
-
-    # Check external secrets
-    log_info "Checking External Secrets sync status..."
+    echo "External Secrets Status:"
+    echo "------------------------"
     kubectl get externalsecrets -A 2>/dev/null || log_warn "No external secrets found"
     echo ""
 
-    # Check cluster secret store
-    log_info "Checking ClusterSecretStore..."
+    echo "ClusterSecretStore Status:"
+    echo "--------------------------"
     kubectl get clustersecretstore 2>/dev/null || log_warn "No cluster secret store found"
     echo ""
 
@@ -293,13 +175,11 @@ main() {
     echo "  DEPLOYMENT_ID: ${DEPLOYMENT_ID}"
     echo "  REGION: ${REGION}"
     echo "  DOMAIN: ${DOMAIN}"
-    echo "  HOSTED_ZONE_ID: ${HOSTED_ZONE_ID:-<not set>}"
     echo ""
 
     configure_kubectl
     wait_for_components
-    get_alb_addresses
-    configure_dns
+    get_ingress_status
     run_health_checks
     display_access_info
 

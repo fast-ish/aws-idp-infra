@@ -132,15 +132,7 @@ certManager:
     version: v1.19.1
     namespace: cert-manager
     values: helm/cert-manager.mustache
-
-awsSecretsStore:
-  chart:
-    name: secrets-store-csi-driver-provider-aws
-    repository: https://aws.github.io/secrets-store-csi-driver-provider-aws
-    release: aws-secrets
-    version: 2.1.1
-    namespace: aws-secrets-store
-    values: helm/aws-secrets-store.mustache
+  clusterIssuer: eks/cluster-issuer.mustache
 
 metricsServer:
   chart:
@@ -561,6 +553,67 @@ argoRollouts:
         "{{deployment:domain}}:name": "{{deployment:team:name}}"
         "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
   ingress: setup/argo-rollouts-ingress.mustache
+
+velero:
+  chart:
+    name: velero
+    repository: https://vmware-tanzu.github.io/helm-charts
+    release: velero
+    version: 11.2.0
+    namespace: velero
+    values: helm/velero.mustache
+  bucket:
+    name: {{deployment:id}}-velero-backups
+    region: {{deployment:region}}
+  serviceAccount:
+    metadata:
+      name: velero
+      namespace: velero
+      labels:
+        "{{deployment:domain}}/resource-type": service-account
+        "{{deployment:domain}}/category": backup
+        "{{deployment:domain}}/type": operations
+        "{{deployment:domain}}/component": velero
+        "{{deployment:domain}}/organization": "{{deployment:organization}}"
+        "{{deployment:domain}}/name": "{{deployment:team:name}}"
+        "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
+      annotations: { }
+    role:
+      name: {{deployment:id}}-velero-sa
+      managedPolicyNames: [ ]
+      customPolicies:
+        - name: {{deployment:id}}-velero
+          policy: policy/velero.mustache
+          mappings:
+            region: {{deployment:region}}
+            account: {{deployment:account}}
+            bucket: {{deployment:id}}-velero-backups
+      tags:
+        "{{deployment:domain}}:resource-type": role
+        "{{deployment:domain}}:category": backup
+        "{{deployment:domain}}:type": operations
+        "{{deployment:domain}}:component": {{deployment:id}}-velero
+        "{{deployment:domain}}:organization": "{{deployment:organization}}"
+        "{{deployment:domain}}:name": "{{deployment:team:name}}"
+        "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+
+goldilocks:
+  chart:
+    name: goldilocks
+    repository: https://charts.fairwinds.com/stable
+    release: goldilocks
+    version: 10.1.0
+    namespace: goldilocks
+    values: helm/goldilocks.mustache
+
+nodeTerminationHandler:
+  chart:
+    name: aws-node-termination-handler
+    repository: https://aws.github.io/eks-charts
+    release: aws-node-termination-handler
+    version: 0.21.0
+    namespace: kube-system
+    values: helm/node-termination-handler.mustache
 
 grafana:
   chart:
