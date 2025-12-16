@@ -11,3 +11,4 @@ target
 cdk.out
 
 cdk.context.json
+scripts/smoke-test/idp-smoke-test

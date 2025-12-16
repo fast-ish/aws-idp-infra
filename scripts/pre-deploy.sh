@@ -415,12 +415,24 @@ create_or_update_secret() {
   local secret_name="$1"
   local client_id="$2"
   local client_secret="$3"
+  local include_server_key="${4:-false}"
 
   local secret_value
-  secret_value=$(jq -n \
-    --arg id "$client_id" \
-    --arg secret "$client_secret" \
-    '{client_id: $id, client_secret: $secret}')
+  if [[ "$include_server_key" == "true" ]]; then
+    # ArgoCD needs server_secretkey for signing tokens
+    local server_secretkey
+    server_secretkey=$(openssl rand -base64 32)
+    secret_value=$(jq -n \
+      --arg id "$client_id" \
+      --arg secret "$client_secret" \
+      --arg serverkey "$server_secretkey" \
+      '{client_id: $id, client_secret: $secret, server_secretkey: $serverkey}')
+  else
+    secret_value=$(jq -n \
+      --arg id "$client_id" \
+      --arg secret "$client_secret" \
+      '{client_id: $id, client_secret: $secret}')
+  fi
 
   log_step "Checking if secret exists: $secret_name"
 
@@ -475,7 +487,7 @@ if [[ "$SKIP_SECRETS" == false ]]; then
 
   create_or_update_secret "$BACKSTAGE_SECRET_NAME" "$BACKSTAGE_CLIENT_ID" "$BACKSTAGE_CLIENT_SECRET"
   echo ""
-  create_or_update_secret "$ARGOCD_SECRET_NAME" "$ARGOCD_CLIENT_ID" "$ARGOCD_CLIENT_SECRET"
+  create_or_update_secret "$ARGOCD_SECRET_NAME" "$ARGOCD_CLIENT_ID" "$ARGOCD_CLIENT_SECRET" "true"
   echo ""
 else
   log_info "Skipping secrets creation"

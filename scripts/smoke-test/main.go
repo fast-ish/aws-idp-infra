@@ -251,7 +251,7 @@ func (s *TestSuite) testSecurity() {
 	}
 
 	// Check ExternalSecrets sync status
-	esGVR := schema.GroupVersionResource{Group: "external-secrets.io", Version: "v1beta1", Resource: "externalsecrets"}
+	esGVR := schema.GroupVersionResource{Group: "external-secrets.io", Version: "v1", Resource: "externalsecrets"}
 	esList, err := s.dynamicClient.Resource(esGVR).Namespace("").List(ctx, metav1.ListOptions{})
 	if err == nil {
 		synced := 0
@@ -581,9 +581,41 @@ func (s *TestSuite) testObservability() {
 	s.printHeader("OBSERVABILITY")
 	ctx := context.Background()
 
-	s.printSection("Grafana Monitoring")
-	// Try multiple label selectors for Grafana (namespace may be "grafana" or "monitoring")
-	pods, err := s.clientset.CoreV1().Pods("monitoring").List(ctx, metav1.ListOptions{})
+	s.printSection("Grafana k8s-monitoring Stack")
+	// Check for k8s-monitoring helm chart components (sends to Grafana Cloud)
+	alloyComponents := []struct {
+		label string
+		name  string
+	}{
+		{"app.kubernetes.io/name=alloy-logs", "Alloy Logs"},
+		{"app.kubernetes.io/name=alloy-metrics", "Alloy Metrics"},
+		{"app.kubernetes.io/name=alloy-singleton", "Alloy Singleton"},
+	}
+	for _, comp := range alloyComponents {
+		pods, err := s.clientset.CoreV1().Pods("monitoring").List(ctx, metav1.ListOptions{
+			LabelSelector: comp.label,
+		})
+		if err == nil && len(pods.Items) > 0 {
+			running := 0
+			for _, pod := range pods.Items {
+				if pod.Status.Phase == "Running" {
+					running++
+				}
+			}
+			if running > 0 {
+				s.pass(fmt.Sprintf("%s: %d running", comp.name, running))
+			} else {
+				s.warn(fmt.Sprintf("%s: none running", comp.name))
+			}
+		} else {
+			s.warn(fmt.Sprintf("%s: not found", comp.name))
+		}
+	}
+
+	// Check Beyla (eBPF auto-instrumentation)
+	pods, err := s.clientset.CoreV1().Pods("monitoring").List(ctx, metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/name=beyla",
+	})
 	if err == nil && len(pods.Items) > 0 {
 		running := 0
 		for _, pod := range pods.Items {
@@ -592,12 +624,8 @@ func (s *TestSuite) testObservability() {
 			}
 		}
 		if running > 0 {
-			s.pass(fmt.Sprintf("Grafana pods: %d running", running))
-		} else {
-			s.warn("Grafana pods: none running")
+			s.pass(fmt.Sprintf("Beyla (eBPF): %d running", running))
 		}
-	} else {
-		s.warn("Monitoring namespace/pods not found")
 	}
 
 	s.printSection("Metrics Server")

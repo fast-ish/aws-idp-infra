@@ -82,6 +82,78 @@ This project provides infrastructure-as-code for a production-ready IDP featurin
 - cdk-common library (built locally)
 - AWS credentials configured
 
+## Pre-deployment Setup
+
+Before deploying, you must create AWS Secrets Manager secrets for GitHub OAuth. Use the provided script:
+
+```bash
+./scripts/pre-deploy.sh \
+  --domain idp.example.com \
+  --prefix myidp \
+  --backstage-client-id Ov23li... \
+  --backstage-client-secret abc123... \
+  --argocd-client-id Ov23li... \
+  --argocd-client-secret def456...
+```
+
+### Required Secrets
+
+The IDP requires two AWS Secrets Manager secrets for GitHub OAuth authentication:
+
+#### Backstage Secret (`{prefix}-backstage-github-oauth`)
+
+| Key             | Description                        |
+|-----------------|------------------------------------|
+| `client_id`     | GitHub OAuth App client ID         |
+| `client_secret` | GitHub OAuth App client secret     |
+
+#### ArgoCD Secret (`{prefix}-argocd-github-oauth`)
+
+| Key               | Description                                    |
+|-------------------|------------------------------------------------|
+| `client_id`       | GitHub OAuth App client ID                     |
+| `client_secret`   | GitHub OAuth App client secret                 |
+| `server_secretkey`| Random key for signing tokens (auto-generated) |
+
+### Troubleshooting Secrets
+
+If ExternalSecrets fail to sync, check:
+
+```bash
+# Check ExternalSecret status
+kubectl get externalsecrets -A
+
+# View sync errors
+kubectl describe externalsecret -n argocd argocd-github-oauth
+```
+
+**Common errors:**
+
+- `SecretSyncedError: could not get secret data from provider` - The AWS secret is missing required keys. Verify all keys exist:
+  ```bash
+  aws secretsmanager get-secret-value --secret-id {prefix}-argocd-github-oauth \
+    --query 'SecretString' --output text | jq 'keys'
+  ```
+
+- Missing `server_secretkey` for ArgoCD will cause the ExternalSecret to fail. Add it manually:
+  ```bash
+  # Get current secret
+  CURRENT=$(aws secretsmanager get-secret-value --secret-id {prefix}-argocd-github-oauth \
+    --query 'SecretString' --output text)
+
+  # Add server_secretkey
+  UPDATED=$(echo "$CURRENT" | jq --arg key "$(openssl rand -base64 32)" \
+    '. + {server_secretkey: $key}')
+
+  # Update secret
+  aws secretsmanager put-secret-value --secret-id {prefix}-argocd-github-oauth \
+    --secret-string "$UPDATED"
+
+  # Force ExternalSecret refresh
+  kubectl annotate externalsecret -n argocd argocd-github-oauth \
+    force-sync=$(date +%s) --overwrite
+  ```
+
 ## Quick Start
 
 1. **Build cdk-common dependency:**
