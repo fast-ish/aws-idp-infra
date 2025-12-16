@@ -2,13 +2,11 @@ package fasti.sh.idp.stack;
 
 import fasti.sh.execute.aws.eks.NamespaceConstruct;
 import fasti.sh.execute.aws.eks.ServiceAccountConstruct;
-import fasti.sh.execute.serialization.Mapper;
-import fasti.sh.execute.serialization.Template;
+import fasti.sh.execute.util.TemplateUtils;
 import fasti.sh.idp.model.IdpReleaseConf;
 import fasti.sh.model.aws.eks.addon.AddonsConf;
 import fasti.sh.model.main.Common;
 import lombok.Getter;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import software.amazon.awscdk.NestedStack;
 import software.amazon.awscdk.NestedStackProps;
@@ -18,11 +16,12 @@ import software.constructs.Construct;
 /**
  * Nested stack for Argo Rollouts infrastructure setup.
  *
- * <p>Creates resources required by Argo Rollouts:
+ * <p>
+ * Creates resources required by Argo Rollouts:
  * <ul>
- *   <li>Kubernetes namespace</li>
- *   <li>IRSA-enabled service account for controller</li>
- *   <li>IRSA-enabled service account for dashboard</li>
+ * <li>Kubernetes namespace</li>
+ * <li>IRSA-enabled service account for controller</li>
+ * <li>IRSA-enabled service account for dashboard</li>
  * </ul>
  */
 @Slf4j
@@ -35,26 +34,28 @@ public class ArgoRolloutsSetupNestedStack extends NestedStack {
   /**
    * Creates the Argo Rollouts setup nested stack.
    *
-   * @param scope   the parent construct
-   * @param common  shared deployment metadata
-   * @param conf    IDP release configuration
-   * @param cluster EKS cluster for namespace and service account creation
-   * @param props   nested stack properties
+   * @param scope
+   *          the parent construct
+   * @param common
+   *          shared deployment metadata
+   * @param conf
+   *          IDP release configuration
+   * @param cluster
+   *          EKS cluster for namespace and service account creation
+   * @param props
+   *          nested stack properties
    */
-  @SneakyThrows
   public ArgoRolloutsSetupNestedStack(
     Construct scope,
     Common common,
     IdpReleaseConf conf,
     Cluster cluster,
-    NestedStackProps props
-  ) {
+    NestedStackProps props) {
     super(scope, "argo-rollouts-setup", props);
 
     log.debug("{} [common: {} conf: {}]", "ArgoRolloutsSetupNestedStack", common, conf);
 
-    var addons = Mapper.get()
-      .readValue(Template.parse(scope, conf.eks().addons()), AddonsConf.class);
+    var addons = TemplateUtils.parseAs(scope, conf.eks().addons(), AddonsConf.class);
 
     this.namespace = new NamespaceConstruct(
       this,

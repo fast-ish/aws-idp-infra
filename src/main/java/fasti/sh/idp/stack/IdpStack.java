@@ -17,18 +17,19 @@ import software.constructs.Construct;
 /**
  * Main CDK stack for the Internal Developer Platform.
  *
- * <p>Orchestrates all nested stacks in the correct dependency order:
+ * <p>
+ * Orchestrates all nested stacks in the correct dependency order:
  * <ol>
- *   <li>Network - VPC and networking infrastructure</li>
- *   <li>EKS - Kubernetes cluster</li>
- *   <li>Core Addons - Essential cluster add-ons (Karpenter, cert-manager, etc.)</li>
- *   <li>Observability Addons - Monitoring and logging (Grafana, Alloy)</li>
- *   <li>IDP Setup - Shared resources (certificates) and component setups</li>
- *   <li>Backstage - Developer portal</li>
- *   <li>ArgoCD - GitOps deployment</li>
- *   <li>Argo Workflows - Workflow automation</li>
- *   <li>Argo Events - Event-driven automation</li>
- *   <li>Argo Rollouts - Progressive delivery</li>
+ * <li>Network - VPC and networking infrastructure</li>
+ * <li>EKS - Kubernetes cluster</li>
+ * <li>Core Addons - Essential cluster add-ons (Karpenter, cert-manager, etc.)</li>
+ * <li>Observability Addons - Monitoring and logging (Grafana, Alloy)</li>
+ * <li>IDP Setup - Shared resources (certificates) and component setups</li>
+ * <li>Backstage - Developer portal</li>
+ * <li>ArgoCD - GitOps deployment</li>
+ * <li>Argo Workflows - Workflow automation</li>
+ * <li>Argo Events - Event-driven automation</li>
+ * <li>Argo Rollouts - Progressive delivery</li>
  * </ol>
  */
 @Getter
@@ -47,9 +48,12 @@ public class IdpStack extends Stack {
   /**
    * Creates the IDP stack with all nested stacks.
    *
-   * @param scope the parent construct
-   * @param conf  IDP release configuration
-   * @param props stack properties including environment and tags
+   * @param scope
+   *          the parent construct
+   * @param conf
+   *          IDP release configuration
+   * @param props
+   *          stack properties including environment and tags
    */
   public IdpStack(Construct scope, IdpReleaseConf conf, StackProps props) {
     super(scope, id("idp", conf.common().version()), props);

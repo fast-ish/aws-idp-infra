@@ -2,15 +2,13 @@ package fasti.sh.idp.stack;
 
 import fasti.sh.execute.aws.iam.RoleConstruct;
 import fasti.sh.execute.aws.rds.RdsConstruct;
-import fasti.sh.execute.serialization.Mapper;
-import fasti.sh.execute.serialization.Template;
+import fasti.sh.execute.util.TemplateUtils;
 import fasti.sh.idp.model.IdpReleaseConf;
 import fasti.sh.model.aws.eks.addon.AddonsConf;
 import fasti.sh.model.aws.eks.addon.backstage.BackstageSetup;
 import fasti.sh.model.main.Common;
 import java.util.List;
 import lombok.Getter;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import software.amazon.awscdk.NestedStack;
 import software.amazon.awscdk.NestedStackProps;
@@ -22,13 +20,15 @@ import software.constructs.Construct;
 /**
  * Nested stack for Backstage infrastructure setup.
  *
- * <p>Creates resources required by Backstage:
+ * <p>
+ * Creates resources required by Backstage:
  * <ul>
- *   <li>RDS PostgreSQL database</li>
- *   <li>IRSA-enabled service account role</li>
+ * <li>RDS PostgreSQL database</li>
+ * <li>IRSA-enabled service account role</li>
  * </ul>
  *
- * <p>GitHub OAuth secret is configured via context (deployment:github:oauth:backstage).
+ * <p>
+ * GitHub OAuth secret is configured via context (deployment:github:oauth:backstage).
  */
 @Slf4j
 @Getter
@@ -39,31 +39,32 @@ public class BackstageSetupNestedStack extends NestedStack {
   /**
    * Creates the Backstage setup nested stack.
    *
-   * @param scope   the parent construct
-   * @param common  shared deployment metadata
-   * @param conf    IDP release configuration
-   * @param vpc     VPC for database placement
-   * @param cluster EKS cluster for service account creation
-   * @param props   nested stack properties
+   * @param scope
+   *          the parent construct
+   * @param common
+   *          shared deployment metadata
+   * @param conf
+   *          IDP release configuration
+   * @param vpc
+   *          VPC for database placement
+   * @param cluster
+   *          EKS cluster for service account creation
+   * @param props
+   *          nested stack properties
    */
-  @SneakyThrows
   public BackstageSetupNestedStack(
     Construct scope,
     Common common,
     IdpReleaseConf conf,
     Vpc vpc,
     Cluster cluster,
-    NestedStackProps props
-  ) {
+    NestedStackProps props) {
     super(scope, "backstage-setup", props);
 
     log.debug("{} [common: {} conf: {}]", "BackstageSetupNestedStack", common, conf);
 
-    var addons = Mapper.get()
-      .readValue(Template.parse(scope, conf.eks().addons()), AddonsConf.class);
-
-    var backstageSetup = Mapper.get()
-      .readValue(Template.parse(scope, addons.backstage().setup()), BackstageSetup.class);
+    var addons = TemplateUtils.parseAs(scope, conf.eks().addons(), AddonsConf.class);
+    var backstageSetup = TemplateUtils.parseAs(scope, addons.backstage().setup(), BackstageSetup.class);
 
     this.database = new RdsConstruct(
       this,

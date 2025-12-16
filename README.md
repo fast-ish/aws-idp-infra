@@ -1,15 +1,16 @@
-# AWS Backstage Infrastructure
+# AWS Internal Developer Platform Infrastructure
 
-CDK infrastructure template for deploying [Backstage.io](https://backstage.io/) developer portal on AWS.
+CDK infrastructure for deploying a complete Internal Developer Platform (IDP) on AWS EKS.
 
 ## Overview
 
-This project provides a complete infrastructure-as-code solution for deploying Backstage on AWS using:
+This project provides infrastructure-as-code for a production-ready IDP featuring:
 
-- **Amazon EKS** - Kubernetes cluster for running Backstage
-- **Amazon RDS PostgreSQL** - Managed database for Backstage metadata
-- **AWS Secrets Manager** - Secure storage for GitHub OAuth credentials
-- **Helm Chart** - Kubernetes deployment of Backstage application
+- **Backstage** - Developer portal for service catalog and documentation
+- **Argo CD** - GitOps continuous delivery
+- **Argo Workflows** - Workflow automation and CI pipelines
+- **Argo Events** - Event-driven automation
+- **Argo Rollouts** - Progressive delivery with canary/blue-green deployments
 
 ## Architecture
 
@@ -24,21 +25,54 @@ This project provides a complete infrastructure-as-code solution for deploying B
                                              |
 +---------------------------------------------|-------------------------------------------+
 |  VPC                                        |                                           |
-|  +----------------+               +---------v---------+                                 |
-|  | Public Subnet  |               |  Private Subnet   |                                 |
-|  |                |               |                   |                                 |
-|  |  NAT Gateway   |               |  +-------------+  |                                 |
-|  |                |               |  |  EKS Nodes  |  |                                 |
-|  +----------------+               |  | (Backstage) |  |                                 |
-|                                   |  +------+------+  |                                 |
-|                                   |         |         |                                 |
-|                                   |  +------v------+  |                                 |
-|                                   |  |   RDS       |  |                                 |
-|                                   |  | PostgreSQL  |  |                                 |
-|                                   |  +-------------+  |                                 |
-|                                   +-------------------+                                 |
+|                                   +---------v---------+                                 |
+|                                   |  Private Subnets  |                                 |
+|                                   |                   |                                 |
+|   +---------------------------+   |  +-------------+  |   +---------------------------+ |
+|   |      Backstage            |   |  |  EKS Nodes  |  |   |      Argo CD              | |
+|   |   Developer Portal        |   |  | (Karpenter) |  |   |   GitOps Engine           | |
+|   +---------------------------+   |  +-------------+  |   +---------------------------+ |
+|                                   |                   |                                 |
+|   +---------------------------+   |  +-------------+  |   +---------------------------+ |
+|   |    Argo Workflows         |   |  |     RDS     |  |   |    Argo Events            | |
+|   |   CI/CD Pipelines         |   |  | PostgreSQL  |  |   |  Event Automation         | |
+|   +---------------------------+   |  +-------------+  |   +---------------------------+ |
+|                                   |                   |                                 |
+|   +---------------------------+   +-------------------+   +---------------------------+ |
+|   |    Argo Rollouts          |                           |     Observability         | |
+|   | Progressive Delivery      |                           |  Grafana + Alloy          | |
+|   +---------------------------+                           +---------------------------+ |
 +-----------------------------------------------------------------------------------------+
 ```
+
+## Components
+
+### Nested Stacks
+
+| Stack                          | Description                                                |
+|--------------------------------|------------------------------------------------------------|
+| NetworkNestedStack             | VPC with public/private subnets, NAT gateways              |
+| EksNestedStack                 | EKS cluster with managed node groups                       |
+| AddonsNestedStack              | Core add-ons (Karpenter, cert-manager, external-dns, etc.) |
+| ObservabilityAddonsNestedStack | Grafana, Alloy for monitoring                              |
+| IdpSetupNestedStack            | Shared certificates and component configuration            |
+| BackstageNestedStack           | Developer portal deployment                                |
+| ArgoCdNestedStack              | GitOps continuous delivery                                 |
+| ArgoWorkflowsNestedStack       | Workflow automation                                        |
+| ArgoEventsNestedStack          | Event-driven triggers                                      |
+| ArgoRolloutsNestedStack        | Progressive delivery                                       |
+
+### Core Add-ons
+
+- **Karpenter** - Kubernetes node autoscaling
+- **cert-manager** - TLS certificate management
+- **external-dns** - Automatic DNS record management
+- **external-secrets** - AWS Secrets Manager integration
+- **AWS Load Balancer Controller** - ALB/NLB ingress
+- **Kyverno** - Policy enforcement
+- **Velero** - Backup and disaster recovery
+- **Metrics Server** - Resource metrics
+- **Reloader** - ConfigMap/Secret change detection
 
 ## Prerequisites
 
@@ -75,92 +109,70 @@ This project provides a complete infrastructure-as-code solution for deploying B
 
 Configuration is managed via Mustache templates in `src/main/resources/production/v1/`:
 
-- `conf.mustache` - Main configuration including VPC, EKS, RDS, and Helm settings
-- `backstage/values.mustache` - Helm chart values for Backstage deployment
+- `conf.mustache` - Main configuration
+- `eks/addons.mustache` - EKS add-on versions
+- `argocd/values.mustache` - Argo CD Helm values
+- `argo-workflows/values.mustache` - Argo Workflows Helm values
+- `argo-events/values.mustache` - Argo Events Helm values
+- `argo-rollouts/values.mustache` - Argo Rollouts Helm values
+- `backstage/values.mustache` - Backstage Helm values
 
 ### Context Variables
 
-Configuration uses CDK context variables for environment-specific values:
+| Variable                  | Description            |
+|---------------------------|------------------------|
+| `platform:id`             | Platform identifier    |
+| `deployment:id`           | Deployment-specific ID |
+| `deployment:account`      | AWS account ID         |
+| `deployment:region`       | AWS region             |
+| `deployment:domain`       | Domain name            |
+| `deployment:organization` | Organization name      |
 
-| Variable | Description |
-|----------|-------------|
-| `platform:id` | Platform identifier |
-| `deployment:id` | Deployment-specific ID |
-| `deployment:account` | AWS account ID |
-| `deployment:region` | AWS region |
-| `deployment:domain` | Domain name for Backstage |
-| `deployment:organization` | Organization name |
+## Smoke Tests
 
-## Components
+Run infrastructure validation:
 
-### CDK Stacks
-
-- **BackstageStack** - Main orchestrating stack
-  - NetworkNestedStack - VPC and networking
-  - EksNestedStack - EKS cluster
-  - BackstageNestedStack - RDS, secrets, Helm deployment
-  - ObservabilityNestedStack - Monitoring and logging
-
-### Helm Chart
-
-Located in `helm/chart/backstage/`:
-
-- Deployment with health checks
-- Service and Ingress (ALB)
-- SecretProviderClass for AWS Secrets
-- Karpenter NodePool and EC2NodeClass
-- ConfigMap with app-config.yaml
-
-## GitHub OAuth Setup
-
-1. Create a GitHub OAuth App at https://github.com/settings/developers
-2. Set callback URL to `https://backstage.{your-domain}/api/auth/github/handler/frame`
-3. Store credentials in AWS Secrets Manager:
-   ```json
-   {
-     "client_id": "your-client-id",
-     "client_secret": "your-client-secret"
-   }
-   ```
+```bash
+cd scripts/smoke-test
+go run main.go
+```
 
 ## Development
-
-### Code Quality
 
 ```bash
 # Run tests
 mvn test
 
-# Check code style
-mvn checkstyle:check
-
-# Static analysis
-mvn spotbugs:check pmd:check
-
 # Format code
 mvn spotless:apply
+
+# Compile
+mvn compile
 ```
 
-### Project Structure
+## Project Structure
 
 ```
-aws-backstage-infra/
-├── src/main/java/fasti/sh/backstage/
+aws-idp-infra/
+├── src/main/java/fasti/sh/idp/
 │   ├── Launch.java                    # CDK app entry point
+│   ├── model/                         # Configuration records
 │   └── stack/
-│       ├── BackstageStack.java        # Main stack
-│       ├── BackstageReleaseConf.java  # Configuration record
-│       └── BackstageNestedStack.java  # Helm deployment
+│       ├── IdpStack.java              # Main orchestrating stack
+│       ├── IdpSetupNestedStack.java   # Shared setup
+│       ├── BackstageNestedStack.java  # Developer portal
+│       ├── ArgoCdNestedStack.java     # GitOps
+│       ├── ArgoWorkflowsNestedStack.java
+│       ├── ArgoEventsNestedStack.java
+│       └── ArgoRolloutsNestedStack.java
 ├── src/main/resources/production/v1/
-│   ├── conf.mustache                  # Main configuration
-│   └── backstage/values.mustache # Helm values
-├── helm/chart/backstage/
-│   ├── Chart.yaml
-│   ├── values.yaml
-│   └── templates/                     # Kubernetes manifests
-└── .github/workflows/                 # CI/CD pipelines
+│   ├── conf.mustache
+│   ├── eks/addons.mustache
+│   └── */values.mustache              # Helm values
+├── scripts/smoke-test/                # Infrastructure tests
+└── helm/                              # Helm charts
 ```
 
 ## License
 
-Apache 2.0 - See [LICENSE.md](LICENSE.md) for details.
+Apache 2.0

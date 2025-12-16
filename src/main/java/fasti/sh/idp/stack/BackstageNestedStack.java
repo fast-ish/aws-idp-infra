@@ -4,14 +4,12 @@ import static fasti.sh.execute.serialization.Format.id;
 
 import fasti.sh.execute.aws.ecr.DockerImageConstruct;
 import fasti.sh.execute.aws.rds.RdsConstruct;
-import fasti.sh.execute.serialization.Mapper;
-import fasti.sh.execute.serialization.Template;
+import fasti.sh.execute.util.TemplateUtils;
 import fasti.sh.idp.model.IdpReleaseConf;
 import fasti.sh.model.aws.eks.addon.AddonsConf;
 import fasti.sh.model.main.Common;
 import java.util.Map;
 import lombok.Getter;
-import lombok.SneakyThrows;
 import software.amazon.awscdk.NestedStack;
 import software.amazon.awscdk.NestedStackProps;
 import software.amazon.awscdk.services.certificatemanager.ICertificate;
@@ -37,6 +35,7 @@ import software.constructs.Construct;
  *
  * <p>
  * <b>Dependency Chain:</b>
+ *
  * <pre>
  * StorageStack (ACM certificate, ClusterSecretStore)
  *        ↓
@@ -54,25 +53,29 @@ public class BackstageNestedStack extends NestedStack {
   /**
    * Creates a new BackstageNestedStack.
    *
-   * @param scope   the parent construct
-   * @param common  shared deployment metadata
-   * @param conf    the Backstage release configuration
-   * @param cluster the EKS cluster to deploy to
-   * @param setup   pre-created resources
-   * @param props   nested stack properties
+   * @param scope
+   *          the parent construct
+   * @param common
+   *          shared deployment metadata
+   * @param conf
+   *          the Backstage release configuration
+   * @param cluster
+   *          the EKS cluster to deploy to
+   * @param setup
+   *          pre-created resources
+   * @param props
+   *          nested stack properties
    */
-  @SneakyThrows
-  public BackstageNestedStack(Construct scope,
-                              Common common,
-                              IdpReleaseConf conf,
-                              Cluster cluster,
-                              IdpSetupNestedStack setup,
-                              NestedStackProps props) {
+  public BackstageNestedStack(
+    Construct scope,
+    Common common,
+    IdpReleaseConf conf,
+    Cluster cluster,
+    IdpSetupNestedStack setup,
+    NestedStackProps props) {
     super(scope, "backstage", props);
 
-    var backstage = Mapper.get()
-      .readValue(Template.parse(scope, conf.eks().addons()), AddonsConf.class)
-      .backstage();
+    var backstage = TemplateUtils.parseAs(scope, conf.eks().addons(), AddonsConf.class).backstage();
 
     this.database = setup.backstage().database();
     this.certificate = setup.certificate().certificate();
@@ -81,22 +84,24 @@ public class BackstageNestedStack extends NestedStack {
 
     var githubOAuthSecret = (String) this.getNode().getContext("deployment:github:oauth:backstage");
 
-    var valuesYaml = Template
-      .parse(
-        this,
-        backstage.chart().values(),
-        Map
-          .of(
-            "database.host", this.database.cluster().getClusterEndpoint().getHostname(),
-            "database.port", "5432",
-            "database.secretArn", this.database.secretConstruct().secret().getSecretArn(),
-            "database.secretName", this.database.secretConstruct().secret().getSecretName(),
-            "auth.github.awsSecretName", githubOAuthSecret,
-            "certificate.arn", this.certificate.getCertificateArn(),
-            "image.uri", this.dockerImage.imageUri()));
+    var mappings = Map
+      .<String, Object>of(
+        "database.host",
+        this.database.cluster().getClusterEndpoint().getHostname(),
+        "database.port",
+        "5432",
+        "database.secretArn",
+        this.database.secretConstruct().secret().getSecretArn(),
+        "database.secretName",
+        this.database.secretConstruct().secret().getSecretName(),
+        "auth.github.awsSecretName",
+        githubOAuthSecret,
+        "certificate.arn",
+        this.certificate.getCertificateArn(),
+        "image.uri",
+        this.dockerImage.imageUri());
 
-
-    var values = (Map<String, Object>) Mapper.get().readValue(valuesYaml, Map.class);
+    var values = TemplateUtils.parseAsMap(this, backstage.chart().values(), mappings);
 
     this.backstageChart = HelmChart.Builder
       .create(this, id("backstage", "chart"))

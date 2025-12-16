@@ -229,7 +229,7 @@ reloader:
     name: reloader
     repository: https://stakater.github.io/stakater-charts
     release: reloader
-    version: 2.2.5
+    version: 2.2.7
     namespace: reloader
     values: helm/reloader.mustache
 
@@ -401,8 +401,8 @@ backstage:
     name: backstage
     namespace: backstage
     release: backstage-{{deployment:team:alias}}
-    repository: ""
     values: helm/backstage.mustache
+    repository: .
     version: "1.0.0"
 
 argoWorkflows:
@@ -411,7 +411,7 @@ argoWorkflows:
     name: argo-workflows
     repository: https://argoproj.github.io/argo-helm
     release: argo-workflows
-    version: 0.46.1
+    version: 0.46.2
     namespace: argo
     values: helm/argo-workflows.mustache
 
@@ -420,7 +420,7 @@ argocd:
     name: argo-cd
     repository: https://argoproj.github.io/argo-helm
     release: argocd
-    version: 9.1.6
+    version: 9.1.7
     namespace: argocd
     values: helm/argocd.mustache
   serviceAccount:

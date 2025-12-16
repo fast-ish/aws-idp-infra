@@ -4,8 +4,7 @@ import fasti.sh.execute.aws.eks.NamespaceConstruct;
 import fasti.sh.execute.aws.eks.ServiceAccountConstruct;
 import fasti.sh.execute.aws.rds.RdsConstruct;
 import fasti.sh.execute.aws.s3.BucketConstruct;
-import fasti.sh.execute.serialization.Mapper;
-import fasti.sh.execute.serialization.Template;
+import fasti.sh.execute.util.TemplateUtils;
 import fasti.sh.idp.model.IdpReleaseConf;
 import fasti.sh.model.aws.eks.addon.AddonsConf;
 import fasti.sh.model.aws.eks.addon.argo.ArgoWorkflowSetup;
@@ -15,7 +14,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.Getter;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import software.amazon.awscdk.NestedStack;
 import software.amazon.awscdk.NestedStackProps;
@@ -26,13 +24,14 @@ import software.constructs.Construct;
 /**
  * Nested stack for Argo Workflows infrastructure setup.
  *
- * <p>Creates resources required by Argo Workflows:
+ * <p>
+ * Creates resources required by Argo Workflows:
  * <ul>
- *   <li>Kubernetes namespace</li>
- *   <li>Team workflow namespaces</li>
- *   <li>S3 bucket for artifact storage</li>
- *   <li>RDS PostgreSQL database for workflow archive</li>
- *   <li>IRSA-enabled service accounts (server, controller, executor)</li>
+ * <li>Kubernetes namespace</li>
+ * <li>Team workflow namespaces</li>
+ * <li>S3 bucket for artifact storage</li>
+ * <li>RDS PostgreSQL database for workflow archive</li>
+ * <li>IRSA-enabled service accounts (server, controller, executor)</li>
  * </ul>
  */
 @Slf4j
@@ -49,31 +48,32 @@ public class ArgoWorkflowsSetupNestedStack extends NestedStack {
   /**
    * Creates the Argo Workflows setup nested stack.
    *
-   * @param scope   the parent construct
-   * @param common  shared deployment metadata
-   * @param conf    IDP release configuration
-   * @param vpc     VPC for database placement
-   * @param cluster EKS cluster for namespace and service account creation
-   * @param props   nested stack properties
+   * @param scope
+   *          the parent construct
+   * @param common
+   *          shared deployment metadata
+   * @param conf
+   *          IDP release configuration
+   * @param vpc
+   *          VPC for database placement
+   * @param cluster
+   *          EKS cluster for namespace and service account creation
+   * @param props
+   *          nested stack properties
    */
-  @SneakyThrows
   public ArgoWorkflowsSetupNestedStack(
     Construct scope,
     Common common,
     IdpReleaseConf conf,
     Vpc vpc,
     Cluster cluster,
-    NestedStackProps props
-  ) {
+    NestedStackProps props) {
     super(scope, "argo-workflows-setup", props);
 
     log.debug("{} [common: {} conf: {}]", "ArgoWorkflowsSetupNestedStack", common, conf);
 
-    var addons = Mapper.get()
-      .readValue(Template.parse(scope, conf.eks().addons()), AddonsConf.class);
-
-    var argoWorkflowsSetup = Mapper.get()
-      .readValue(Template.parse(scope, addons.argoWorkflows().setup()), ArgoWorkflowSetup.class);
+    var addons = TemplateUtils.parseAs(scope, conf.eks().addons(), AddonsConf.class);
+    var argoWorkflowsSetup = TemplateUtils.parseAs(scope, addons.argoWorkflows().setup(), ArgoWorkflowSetup.class);
 
     this.namespace = new NamespaceConstruct(
       this,
