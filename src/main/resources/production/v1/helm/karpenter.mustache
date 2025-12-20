@@ -11,8 +11,8 @@ settings:
   batchIdleDuration: 1s
 
 serviceAccount:
-  create: false
-  name: {{deployment:id}}-karpenter-sa
+  create: true
+  name: karpenter
 
 controller:
   resources:

@@ -499,17 +499,9 @@ func (s *TestSuite) testArgoEvents() {
 	}
 
 	s.printSection("Service Account")
-	sa, err := s.clientset.CoreV1().ServiceAccounts("argo-events").Get(ctx, "argo-events-controller", metav1.GetOptions{})
+	_, err = s.clientset.CoreV1().ServiceAccounts("argo-events").Get(ctx, "argo-events-controller", metav1.GetOptions{})
 	if err == nil {
-		if sa.Annotations != nil {
-			if roleArn, ok := sa.Annotations["eks.amazonaws.com/role-arn"]; ok && roleArn != "" {
-				s.pass("Controller service account has IRSA")
-			} else {
-				s.warn("Controller service account missing IRSA annotation")
-			}
-		} else {
-			s.warn("Controller service account has no annotations")
-		}
+		s.pass("Controller service account exists")
 	} else {
 		s.fail("Controller service account not found")
 	}
@@ -557,17 +549,9 @@ func (s *TestSuite) testArgoRollouts() {
 	s.printSection("Service Accounts")
 	saNames := []string{"argo-rollouts-controller", "argo-rollouts-dashboard"}
 	for _, saName := range saNames {
-		sa, err := s.clientset.CoreV1().ServiceAccounts("argo-rollouts").Get(ctx, saName, metav1.GetOptions{})
+		_, err := s.clientset.CoreV1().ServiceAccounts("argo-rollouts").Get(ctx, saName, metav1.GetOptions{})
 		if err == nil {
-			if sa.Annotations != nil {
-				if roleArn, ok := sa.Annotations["eks.amazonaws.com/role-arn"]; ok && roleArn != "" {
-					s.pass(fmt.Sprintf("%s has IRSA", saName))
-				} else {
-					s.warn(fmt.Sprintf("%s missing IRSA annotation", saName))
-				}
-			} else {
-				s.warn(fmt.Sprintf("%s has no annotations", saName))
-			}
+			s.pass(fmt.Sprintf("%s exists", saName))
 		} else {
 			s.warn(fmt.Sprintf("%s not found", saName))
 		}

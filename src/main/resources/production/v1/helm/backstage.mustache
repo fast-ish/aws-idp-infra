@@ -102,8 +102,7 @@ node:
 serviceAccount:
   create: true
   name: {{deployment:id}}-backstage-sa
-  annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::{{deployment:account}}:role/{{deployment:id}}-backstage-sa-role
+  annotations: {}
 
 env:
   - name: POSTGRES_HOST

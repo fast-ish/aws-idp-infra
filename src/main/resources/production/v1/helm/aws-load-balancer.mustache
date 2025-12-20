@@ -6,8 +6,8 @@ clusterName: {{deployment:id}}-eks
 replicaCount: 2
 
 serviceAccount:
-  create: false
-  name: {{deployment:id}}-aws-load-balancer-sa
+  create: true
+  name: aws-load-balancer-controller
 
 enableServiceMutatorWebhook: false
 

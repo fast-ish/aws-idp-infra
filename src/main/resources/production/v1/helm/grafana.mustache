@@ -20,7 +20,7 @@ destinations:
     auth:
       type: basic
       username: "{{deployment:eks:grafana:prometheusUsername}}"
-      password: {{deployment:eks:grafana:key}}
+      password: {{{deployment:eks:grafana:key}}}
     writeRelabelConfigs: []
 
   - name: grafana-cloud-logs
@@ -29,7 +29,7 @@ destinations:
     auth:
       type: basic
       username: "{{deployment:eks:grafana:lokiUsername}}"
-      password: {{deployment:eks:grafana:key}}
+      password: {{{deployment:eks:grafana:key}}}
     tenantId: ""
 
   - name: grafana-cloud-traces
@@ -39,7 +39,7 @@ destinations:
     auth:
       type: basic
       username: "{{deployment:eks:grafana:tempoUsername}}"
-      password: {{deployment:eks:grafana:key}}
+      password: {{{deployment:eks:grafana:key}}}
     metrics:
       enabled: false
     logs:
@@ -53,7 +53,7 @@ destinations:
     auth:
       type: basic
       username: "{{deployment:eks:grafana:instanceId}}"
-      password: {{deployment:eks:grafana:key}}
+      password: {{{deployment:eks:grafana:key}}}
 
 clusterMetrics:
   enabled: true
@@ -119,7 +119,7 @@ clusterMetrics:
       prometheus:
         existingSecretName: grafana-cloud-metrics-k8s-monitoring
         username: "{{deployment:eks:grafana:prometheusUsername}}"
-        password: {{deployment:eks:grafana:key}}
+        password: {{{deployment:eks:grafana:key}}}
         external:
           url: {{deployment:eks:grafana:prometheusHost}}/api/prom
       ui:
@@ -334,7 +334,7 @@ alloy-metrics:
       enabled: true
     extraEnv:
       - name: GCLOUD_RW_API_KEY
-        value: {{deployment:eks:grafana:key}}
+        value: {{{deployment:eks:grafana:key}}}
       - name: CLUSTER_NAME
         value: "{{deployment:id}}-eks"
       - name: NAMESPACE
@@ -360,7 +360,7 @@ alloy-singleton:
         memory: 256Mi
     extraEnv:
       - name: GCLOUD_RW_API_KEY
-        value: {{deployment:eks:grafana:key}}
+        value: {{{deployment:eks:grafana:key}}}
       - name: CLUSTER_NAME
         value: "{{deployment:id}}-eks"
       - name: NAMESPACE
@@ -389,7 +389,7 @@ alloy-logs:
       dockercontainers: true
     extraEnv:
       - name: GCLOUD_RW_API_KEY
-        value: {{deployment:eks:grafana:key}}
+        value: {{{deployment:eks:grafana:key}}}
       - name: CLUSTER_NAME
         value: "{{deployment:id}}-eks"
       - name: NAMESPACE
@@ -444,7 +444,7 @@ alloy-receiver:
         protocol: TCP
     extraEnv:
       - name: GCLOUD_RW_API_KEY
-        value: {{deployment:eks:grafana:key}}
+        value: {{{deployment:eks:grafana:key}}}
       - name: CLUSTER_NAME
         value: "{{deployment:id}}-eks"
       - name: NAMESPACE
@@ -476,7 +476,7 @@ alloy-profiles:
       privileged: true
     extraEnv:
       - name: GCLOUD_RW_API_KEY
-        value: {{deployment:eks:grafana:key}}
+        value: {{{deployment:eks:grafana:key}}}
       - name: CLUSTER_NAME
         value: "{{deployment:id}}-eks"
       - name: NAMESPACE

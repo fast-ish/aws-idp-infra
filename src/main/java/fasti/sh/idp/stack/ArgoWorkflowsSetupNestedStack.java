@@ -1,7 +1,6 @@
 package fasti.sh.idp.stack;
 
 import fasti.sh.execute.aws.eks.NamespaceConstruct;
-import fasti.sh.execute.aws.eks.ServiceAccountConstruct;
 import fasti.sh.execute.aws.rds.RdsConstruct;
 import fasti.sh.execute.aws.s3.BucketConstruct;
 import fasti.sh.execute.util.TemplateUtils;
@@ -25,13 +24,12 @@ import software.constructs.Construct;
  * Nested stack for Argo Workflows infrastructure setup.
  *
  * <p>
- * Creates resources required by Argo Workflows:
+ * Creates infrastructure resources required by Argo Workflows:
  * <ul>
- * <li>Kubernetes namespace</li>
+ * <li>Kubernetes namespace for Argo Workflows</li>
  * <li>Team workflow namespaces</li>
  * <li>S3 bucket for artifact storage</li>
  * <li>RDS PostgreSQL database for workflow archive</li>
- * <li>IRSA-enabled service accounts (server, controller, executor)</li>
  * </ul>
  */
 @Slf4j
@@ -41,9 +39,6 @@ public class ArgoWorkflowsSetupNestedStack extends NestedStack {
   private final BucketConstruct artifactsBucket;
   private final RdsConstruct database;
   private final Map<String, NamespaceConstruct> teamNamespaces;
-  private final ServiceAccountConstruct serverServiceAccount;
-  private final ServiceAccountConstruct controllerServiceAccount;
-  private final ServiceAccountConstruct executorServiceAccount;
 
   /**
    * Creates the Argo Workflows setup nested stack.
@@ -57,7 +52,7 @@ public class ArgoWorkflowsSetupNestedStack extends NestedStack {
    * @param vpc
    *          VPC for database placement
    * @param cluster
-   *          EKS cluster for namespace and service account creation
+   *          EKS cluster for namespace creation
    * @param props
    *          nested stack properties
    */
@@ -75,10 +70,11 @@ public class ArgoWorkflowsSetupNestedStack extends NestedStack {
     var addons = TemplateUtils.parseAs(scope, conf.eks().addons(), AddonsConf.class);
     var argoWorkflowsSetup = TemplateUtils.parseAs(scope, addons.argoWorkflows().setup(), ArgoWorkflowSetup.class);
 
+    // Create main namespace using metadata from serverPodIdentity
     this.namespace = new NamespaceConstruct(
       this,
       common,
-      argoWorkflowsSetup.serverServiceAccount().metadata(),
+      argoWorkflowsSetup.serverPodIdentity().metadata(),
       cluster);
 
     this.artifactsBucket = new BucketConstruct(scope, common, argoWorkflowsSetup.artifactBucket());
@@ -104,14 +100,5 @@ public class ArgoWorkflowsSetupNestedStack extends NestedStack {
 
       this.teamNamespaces.put(ns, team);
     });
-
-    this.serverServiceAccount = new ServiceAccountConstruct(this, common, argoWorkflowsSetup.serverServiceAccount(), cluster);
-    this.serverServiceAccount.getNode().addDependency(this.namespace);
-
-    this.controllerServiceAccount = new ServiceAccountConstruct(this, common, argoWorkflowsSetup.controllerServiceAccount(), cluster);
-    this.controllerServiceAccount.getNode().addDependency(this.namespace);
-
-    this.executorServiceAccount = new ServiceAccountConstruct(this, common, argoWorkflowsSetup.executorServiceAccount(), cluster);
-    this.executorServiceAccount.getNode().addDependency(this.namespace);
   }
 }

@@ -1,6 +1,6 @@
 secret: {{deployment:id}}-backstage-github-oauth
 
-serviceAccount:
+podIdentity:
   metadata:
     name: {{deployment:id}}-backstage-sa
     namespace: backstage
@@ -14,10 +14,10 @@ serviceAccount:
       "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
     annotations: { }
   role:
-    name: {{deployment:id}}-backstage-sa-role
+    name: {{deployment:id}}-backstage-pod-identity
     principal:
       type: service
-      value: ec2.amazonaws.com
+      value: pods.eks.amazonaws.com
     managedPolicyNames: [ ]
     customPolicies:
       - name: {{deployment:id}}-backstage-secret-access
@@ -34,6 +34,10 @@ serviceAccount:
       "{{deployment:domain}}:organization": "{{deployment:organization}}"
       "{{deployment:domain}}:name": "{{deployment:team:name}}"
       "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+  tags:
+    "{{deployment:domain}}:resource-type": pod-identity-association
+    "{{deployment:domain}}:category": compute
+    "{{deployment:domain}}:type": backstage
 
 database:
   version: "17.6"

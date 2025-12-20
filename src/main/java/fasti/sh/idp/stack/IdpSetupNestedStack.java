@@ -20,11 +20,8 @@ import software.constructs.Construct;
  * Orchestrates component-specific setup stacks:
  * <ul>
  * <li>ACM certificate for TLS (shared across all components)</li>
- * <li>BackstageSetupNestedStack - database, service account</li>
- * <li>ArgoCdSetupNestedStack - namespace, service account</li>
- * <li>ArgoWorkflowsSetupNestedStack - database, artifacts bucket, service accounts</li>
- * <li>ArgoEventsSetupNestedStack - namespace, service account</li>
- * <li>ArgoRolloutsSetupNestedStack - namespace, service accounts</li>
+ * <li>BackstageSetupNestedStack - RDS database</li>
+ * <li>ArgoWorkflowsSetupNestedStack - RDS database, S3 bucket, team namespaces</li>
  * </ul>
  *
  * <p>
@@ -35,10 +32,7 @@ import software.constructs.Construct;
 public class IdpSetupNestedStack extends NestedStack {
   private final AcmCertificateConstruct certificate;
   private final BackstageSetupNestedStack backstage;
-  private final ArgoCdSetupNestedStack argocd;
   private final ArgoWorkflowsSetupNestedStack argoWorkflows;
-  private final ArgoEventsSetupNestedStack argoEvents;
-  private final ArgoRolloutsSetupNestedStack argoRollouts;
 
   /**
    * Creates the IDP setup nested stack.
@@ -52,7 +46,7 @@ public class IdpSetupNestedStack extends NestedStack {
    * @param vpc
    *          VPC for database placement
    * @param cluster
-   *          EKS cluster for namespace and service account creation
+   *          EKS cluster for namespace creation
    * @param props
    *          nested stack properties
    */
@@ -79,32 +73,11 @@ public class IdpSetupNestedStack extends NestedStack {
       cluster,
       NestedStackProps.builder().build());
 
-    this.argocd = new ArgoCdSetupNestedStack(
-      this,
-      common,
-      conf,
-      cluster,
-      NestedStackProps.builder().build());
-
     this.argoWorkflows = new ArgoWorkflowsSetupNestedStack(
       this,
       common,
       conf,
       vpc,
-      cluster,
-      NestedStackProps.builder().build());
-
-    this.argoEvents = new ArgoEventsSetupNestedStack(
-      this,
-      common,
-      conf,
-      cluster,
-      NestedStackProps.builder().build());
-
-    this.argoRollouts = new ArgoRolloutsSetupNestedStack(
-      this,
-      common,
-      conf,
       cluster,
       NestedStackProps.builder().build());
   }

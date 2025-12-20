@@ -159,6 +159,7 @@ public class IdpStack extends Stack {
       conf,
       this.eks.cluster(),
       this.setup,
+      this.argocd,
       NestedStackProps
         .builder()
         .description(describe(conf.common(), "idp::argo-rollouts"))

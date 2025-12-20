@@ -2,6 +2,7 @@ domainName: "*.{{deployment:domain}}"
 subjectAlternativeNames:
   - "{{deployment:domain}}"
 validationMethod: DNS
+hostedZoneName: "{{deployment:domain}}"
 removalPolicy: retain
 tags:
   "{{deployment:domain}}:resource-type": certificate

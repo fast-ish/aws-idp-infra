@@ -3,7 +3,7 @@ server:
   servicePort: 2746
 
   serviceAccount:
-    create: false
+    create: true
     name: argo-server
 
   authModes:
@@ -75,7 +75,7 @@ controller:
   replicas: 2
 
   serviceAccount:
-    create: false
+    create: true
     name: argo-workflow-controller
 
   workflowNamespaces:
@@ -173,7 +173,7 @@ artifactRepository:
 
 workflow:
   serviceAccount:
-    create: false
+    create: true
     name: argo-workflow
   rbac:
     create: true

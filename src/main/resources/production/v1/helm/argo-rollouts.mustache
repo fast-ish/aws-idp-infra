@@ -2,7 +2,7 @@ controller:
   replicas: 2
 
   serviceAccount:
-    create: false
+    create: true
     name: argo-rollouts-controller
 
   metrics:
@@ -38,7 +38,7 @@ dashboard:
   replicas: 2
 
   serviceAccount:
-    create: false
+    create: true
     name: argo-rollouts-dashboard
 
   resources:
@@ -69,3 +69,42 @@ keepCRDs: true
 
 notifications:
   enabled: false
+
+extraObjects:
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: argo-rollouts-alb-oidc
+      namespace: argo-rollouts
+      labels:
+        app.kubernetes.io/part-of: argo-rollouts
+    type: Opaque
+    stringData:
+      clientId: argo-rollouts
+      clientSecret: "{{argoRollouts.ssoClientSecret}}"
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    metadata:
+      name: alb-controller-secrets-reader
+      namespace: argo-rollouts
+      labels:
+        app.kubernetes.io/part-of: argo-rollouts
+    rules:
+      - apiGroups: [""]
+        resources: ["secrets"]
+        verbs: ["get"]
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: alb-controller-secrets-reader
+      namespace: argo-rollouts
+      labels:
+        app.kubernetes.io/part-of: argo-rollouts
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: Role
+      name: alb-controller-secrets-reader
+    subjects:
+      - kind: ServiceAccount
+        name: aws-load-balancer-controller
+        namespace: aws-load-balancer

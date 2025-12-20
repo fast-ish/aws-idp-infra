@@ -1,5 +1,6 @@
 package fasti.sh.idp.stack;
 
+import fasti.sh.execute.aws.eks.PodIdentityConstruct;
 import fasti.sh.execute.util.TemplateUtils;
 import fasti.sh.idp.model.IdpReleaseConf;
 import fasti.sh.model.aws.eks.addon.AddonsConf;
@@ -24,12 +25,15 @@ import software.constructs.Construct;
  * <li>SSO authentication via ArgoCD's Dex instance</li>
  * <li>PostgreSQL persistence for workflow archive</li>
  * <li>S3 artifact storage</li>
- * <li>IRSA-enabled service accounts for server, controller, and executor</li>
+ * <li>Pod Identity for server, controller, and executor</li>
  * </ul>
  */
 @Slf4j
 @Getter
 public class ArgoWorkflowsNestedStack extends NestedStack {
+  private final PodIdentityConstruct serverPodIdentity;
+  private final PodIdentityConstruct controllerPodIdentity;
+  private final PodIdentityConstruct executorPodIdentity;
   private final HelmChart chart;
 
   /**
@@ -44,7 +48,7 @@ public class ArgoWorkflowsNestedStack extends NestedStack {
    * @param cluster
    *          the EKS cluster to deploy to
    * @param setup
-   *          pre-created resources (databases, buckets, service accounts)
+   *          pre-created resources (databases, buckets, team namespaces)
    * @param argocd
    *          ArgoCD stack (provides SSO client secret)
    * @param props
@@ -75,13 +79,17 @@ public class ArgoWorkflowsNestedStack extends NestedStack {
     var argoWorkflows = TemplateUtils.parseAs(scope, conf.eks().addons(), AddonsConf.class).argoWorkflows();
     var argoWorkflowsSetup = TemplateUtils.parseAs(scope, argoWorkflows.setup(), ArgoWorkflowSetup.class);
 
+    this.serverPodIdentity = new PodIdentityConstruct(this, common, argoWorkflowsSetup.serverPodIdentity(), cluster);
+    this.controllerPodIdentity = new PodIdentityConstruct(this, common, argoWorkflowsSetup.controllerPodIdentity(), cluster);
+    this.executorPodIdentity = new PodIdentityConstruct(this, common, argoWorkflowsSetup.executorPodIdentity(), cluster);
+
     var templateMappings = new HashMap<String, Object>();
     templateMappings.put("region", common.region());
     templateMappings.put("domain", common.domain());
     templateMappings.put("workflowNamespaces", argoWorkflowsSetupStack.teamNamespaces().keySet());
-    templateMappings.put("argoServer.role.arn", argoWorkflowsSetupStack.serverServiceAccount().roleConstruct().role().getRoleArn());
-    templateMappings.put("argoController.role.arn", argoWorkflowsSetupStack.controllerServiceAccount().roleConstruct().role().getRoleArn());
-    templateMappings.put("workflowExecutor.role.arn", argoWorkflowsSetupStack.executorServiceAccount().roleConstruct().role().getRoleArn());
+    templateMappings.put("argoServer.role.arn", this.serverPodIdentity.roleConstruct().role().getRoleArn());
+    templateMappings.put("argoController.role.arn", this.controllerPodIdentity.roleConstruct().role().getRoleArn());
+    templateMappings.put("workflowExecutor.role.arn", this.executorPodIdentity.roleConstruct().role().getRoleArn());
     templateMappings.put("artifactBucket", argoWorkflowsSetupStack.artifactsBucket().bucket().getBucketName());
 
     templateMappings.put("certificate.arn", setup.certificate().certificate().getCertificateArn());
@@ -99,7 +107,7 @@ public class ArgoWorkflowsNestedStack extends NestedStack {
       .wait(true)
       .timeout(Duration.minutes(15))
       .skipCrds(false)
-      .createNamespace(false)
+      .createNamespace(true)
       .chart(argoWorkflows.chart().name())
       .namespace(argoWorkflows.chart().namespace())
       .repository(argoWorkflows.chart().repository())

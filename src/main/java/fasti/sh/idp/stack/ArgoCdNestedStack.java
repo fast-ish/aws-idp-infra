@@ -1,5 +1,6 @@
 package fasti.sh.idp.stack;
 
+import fasti.sh.execute.aws.eks.PodIdentityConstruct;
 import fasti.sh.execute.util.TemplateUtils;
 import fasti.sh.idp.model.IdpReleaseConf;
 import fasti.sh.model.aws.eks.addon.AddonsConf;
@@ -25,6 +26,7 @@ import software.constructs.Construct;
 @Slf4j
 @Getter
 public class ArgoCdNestedStack extends NestedStack {
+  private final PodIdentityConstruct podIdentity;
   private final HelmChart chart;
   private final String argoWorkflowsSsoClientSecret;
   private final String argoRolloutsSsoClientSecret;
@@ -41,7 +43,7 @@ public class ArgoCdNestedStack extends NestedStack {
    * @param cluster
    *          the EKS cluster to deploy to
    * @param setup
-   *          pre-created resources (certificates, service accounts)
+   *          pre-created resources (certificates)
    * @param props
    *          nested stack properties
    */
@@ -61,18 +63,19 @@ public class ArgoCdNestedStack extends NestedStack {
 
     var argocd = TemplateUtils.parseAs(scope, conf.eks().addons(), AddonsConf.class).argocd();
 
+    this.podIdentity = new PodIdentityConstruct(this, common, argocd.podIdentity(), cluster);
+
     var githubOrg = (String) this.getNode().getContext("deployment:github:org");
     var githubOAuthSecret = (String) this.getNode().getContext("deployment:github:oauth:argocd");
 
     var templateMappings = new HashMap<String, Object>();
-    templateMappings.put("repoServer.role.arn", setup.argocd().serviceAccount().roleConstruct().role().getRoleArn());
+    templateMappings.put("repoServer.role.arn", this.podIdentity.roleConstruct().role().getRoleArn());
     templateMappings.put("domain", common.domain());
     templateMappings.put("certificate.arn", setup.certificate().certificate().getCertificateArn());
     templateMappings.put("github.org", githubOrg);
     templateMappings.put("github.oauthSecretName", githubOAuthSecret);
     templateMappings.put("argoWorkflows.ssoClientSecret", this.argoWorkflowsSsoClientSecret);
     templateMappings.put("argoRollouts.ssoClientSecret", this.argoRolloutsSsoClientSecret);
-    templateMappings.put("alb.serviceAccountName", common.id() + "-aws-load-balancer-sa");
 
     var values = TemplateUtils.parseAsMap(scope, argocd.chart().values(), templateMappings);
     this.chart = HelmChart.Builder
@@ -81,7 +84,7 @@ public class ArgoCdNestedStack extends NestedStack {
       .wait(true)
       .timeout(Duration.minutes(15))
       .skipCrds(false)
-      .createNamespace(false)
+      .createNamespace(true)
       .chart(argocd.chart().name())
       .namespace(argocd.chart().namespace())
       .repository(argocd.chart().repository())

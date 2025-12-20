@@ -5,7 +5,7 @@ workflowNamespaces:
   - team-ml
   - team-integrations
 
-serverServiceAccount:
+serverPodIdentity:
   metadata:
     name: argo-server
     namespace: argo
@@ -19,7 +19,10 @@ serverServiceAccount:
       "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
     annotations: { }
   role:
-    name: {{deployment:id}}-argo-server-sa
+    name: {{deployment:id}}-argo-server-pod-identity
+    principal:
+      type: service
+      value: pods.eks.amazonaws.com
     managedPolicyNames: [ ]
     customPolicies:
       - name: {{deployment:id}}-argo-server-s3
@@ -34,8 +37,12 @@ serverServiceAccount:
       "{{deployment:domain}}:organization": "{{deployment:organization}}"
       "{{deployment:domain}}:name": "{{deployment:team:name}}"
       "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+  tags:
+    "{{deployment:domain}}:resource-type": pod-identity-association
+    "{{deployment:domain}}:category": ci-cd
+    "{{deployment:domain}}:type": argo-workflows
 
-controllerServiceAccount:
+controllerPodIdentity:
   metadata:
     name: argo-workflow-controller
     namespace: argo
@@ -49,7 +56,10 @@ controllerServiceAccount:
       "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
     annotations: { }
   role:
-    name: {{deployment:id}}-argo-controller-sa
+    name: {{deployment:id}}-argo-controller-pod-identity
+    principal:
+      type: service
+      value: pods.eks.amazonaws.com
     managedPolicyNames: [ ]
     customPolicies:
       - name: {{deployment:id}}-argo-controller-s3
@@ -64,8 +74,12 @@ controllerServiceAccount:
       "{{deployment:domain}}:organization": "{{deployment:organization}}"
       "{{deployment:domain}}:name": "{{deployment:team:name}}"
       "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+  tags:
+    "{{deployment:domain}}:resource-type": pod-identity-association
+    "{{deployment:domain}}:category": ci-cd
+    "{{deployment:domain}}:type": argo-workflows
 
-executorServiceAccount:
+executorPodIdentity:
   metadata:
     name: argo-workflow
     namespace: argo
@@ -79,7 +93,10 @@ executorServiceAccount:
       "{{deployment:domain}}/alias": "{{deployment:team:alias}}"
     annotations: { }
   role:
-    name: {{deployment:id}}-argo-executor-sa
+    name: {{deployment:id}}-argo-executor-pod-identity
+    principal:
+      type: service
+      value: pods.eks.amazonaws.com
     managedPolicyNames: [ ]
     customPolicies:
       - name: {{deployment:id}}-argo-executor
@@ -97,6 +114,10 @@ executorServiceAccount:
       "{{deployment:domain}}:organization": "{{deployment:organization}}"
       "{{deployment:domain}}:name": "{{deployment:team:name}}"
       "{{deployment:domain}}:alias": "{{deployment:team:alias}}"
+  tags:
+    "{{deployment:domain}}:resource-type": pod-identity-association
+    "{{deployment:domain}}:category": ci-cd
+    "{{deployment:domain}}:type": argo-workflows
 
 artifactBucket:
   name: {{deployment:id}}-argo-artifacts

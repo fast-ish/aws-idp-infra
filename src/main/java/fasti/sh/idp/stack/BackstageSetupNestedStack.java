@@ -1,6 +1,5 @@
 package fasti.sh.idp.stack;
 
-import fasti.sh.execute.aws.iam.RoleConstruct;
 import fasti.sh.execute.aws.rds.RdsConstruct;
 import fasti.sh.execute.util.TemplateUtils;
 import fasti.sh.idp.model.IdpReleaseConf;
@@ -14,17 +13,15 @@ import software.amazon.awscdk.NestedStack;
 import software.amazon.awscdk.NestedStackProps;
 import software.amazon.awscdk.services.ec2.Vpc;
 import software.amazon.awscdk.services.eks.Cluster;
-import software.amazon.awscdk.services.iam.Role;
 import software.constructs.Construct;
 
 /**
  * Nested stack for Backstage infrastructure setup.
  *
  * <p>
- * Creates resources required by Backstage:
+ * Creates infrastructure resources required by Backstage:
  * <ul>
  * <li>RDS PostgreSQL database</li>
- * <li>IRSA-enabled service account role</li>
  * </ul>
  *
  * <p>
@@ -34,7 +31,6 @@ import software.constructs.Construct;
 @Getter
 public class BackstageSetupNestedStack extends NestedStack {
   private final RdsConstruct database;
-  private final Role serviceAccountRole;
 
   /**
    * Creates the Backstage setup nested stack.
@@ -48,7 +44,7 @@ public class BackstageSetupNestedStack extends NestedStack {
    * @param vpc
    *          VPC for database placement
    * @param cluster
-   *          EKS cluster for service account creation
+   *          EKS cluster (for security group reference)
    * @param props
    *          nested stack properties
    */
@@ -72,9 +68,5 @@ public class BackstageSetupNestedStack extends NestedStack {
       backstageSetup.database(),
       vpc,
       List.of(cluster.getClusterSecurityGroup()));
-
-    var oidc = cluster.getOpenIdConnectProvider();
-    var principal = backstageSetup.serviceAccount().role().principal().oidcPrincipal(this, oidc, backstageSetup.serviceAccount());
-    this.serviceAccountRole = new RoleConstruct(this, common, principal, backstageSetup.serviceAccount().role()).role();
   }
 }

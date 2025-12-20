@@ -1,5 +1,6 @@
 package fasti.sh.idp.stack;
 
+import fasti.sh.execute.aws.eks.PodIdentityConstruct;
 import fasti.sh.execute.util.TemplateUtils;
 import fasti.sh.idp.model.IdpReleaseConf;
 import fasti.sh.model.aws.eks.addon.AddonsConf;
@@ -22,12 +23,13 @@ import software.constructs.Construct;
  * <li>Event controller with leader election</li>
  * <li>NATS JetStream-based event bus</li>
  * <li>Webhook for HTTP event sources</li>
- * <li>IRSA-enabled controller service account for AWS integrations</li>
+ * <li>Pod Identity-enabled controller service account for AWS integrations</li>
  * </ul>
  */
 @Slf4j
 @Getter
 public class ArgoEventsNestedStack extends NestedStack {
+  private final PodIdentityConstruct controllerPodIdentity;
   private final HelmChart chart;
 
   /**
@@ -42,7 +44,7 @@ public class ArgoEventsNestedStack extends NestedStack {
    * @param cluster
    *          the EKS cluster to deploy to
    * @param setup
-   *          IDP setup (provides argoEvents setup)
+   *          IDP setup (no longer used)
    * @param props
    *          nested stack properties
    */
@@ -58,6 +60,9 @@ public class ArgoEventsNestedStack extends NestedStack {
     log.debug("{} [common: {} conf: {}]", "ArgoEventsNestedStack", common, conf);
 
     var argoEvents = TemplateUtils.parseAs(scope, conf.eks().addons(), AddonsConf.class).argoEvents();
+
+    this.controllerPodIdentity = new PodIdentityConstruct(this, common, argoEvents.controllerPodIdentity(), cluster);
+
     var values = TemplateUtils.parseAsMap(scope, argoEvents.chart().values());
 
     this.chart = HelmChart.Builder
@@ -66,7 +71,7 @@ public class ArgoEventsNestedStack extends NestedStack {
       .wait(true)
       .timeout(Duration.minutes(15))
       .skipCrds(false)
-      .createNamespace(false)
+      .createNamespace(true)
       .chart(argoEvents.chart().name())
       .namespace(argoEvents.chart().namespace())
       .repository(argoEvents.chart().repository())

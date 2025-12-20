@@ -3,10 +3,12 @@ package fasti.sh.idp.stack;
 import static fasti.sh.execute.serialization.Format.id;
 
 import fasti.sh.execute.aws.ecr.DockerImageConstruct;
+import fasti.sh.execute.aws.eks.PodIdentityConstruct;
 import fasti.sh.execute.aws.rds.RdsConstruct;
 import fasti.sh.execute.util.TemplateUtils;
 import fasti.sh.idp.model.IdpReleaseConf;
 import fasti.sh.model.aws.eks.addon.AddonsConf;
+import fasti.sh.model.aws.eks.addon.backstage.BackstageSetup;
 import fasti.sh.model.main.Common;
 import java.util.Map;
 import lombok.Getter;
@@ -15,7 +17,6 @@ import software.amazon.awscdk.NestedStackProps;
 import software.amazon.awscdk.services.certificatemanager.ICertificate;
 import software.amazon.awscdk.services.eks.Cluster;
 import software.amazon.awscdk.services.eks.HelmChart;
-import software.amazon.awscdk.services.iam.IRole;
 import software.amazon.awscdk.services.s3.assets.Asset;
 import software.amazon.awscdk.services.s3.assets.AssetProps;
 import software.constructs.Construct;
@@ -29,7 +30,7 @@ import software.constructs.Construct;
  * <li>RDS database for Backstage</li>
  * <li>Database credentials sync via ExternalSecrets</li>
  * <li>GitHub OAuth secret lookup (pre-existing secret)</li>
- * <li>IAM role for Backstage service account (IRSA)</li>
+ * <li>Pod Identity for Backstage service account</li>
  * <li>Backstage Helm chart deployment to EKS</li>
  * </ul>
  *
@@ -39,13 +40,13 @@ import software.constructs.Construct;
  * <pre>
  * StorageStack (ACM certificate, ClusterSecretStore)
  *        ↓
- * BackstageStack (this construct - RDS, Helm chart + ExternalSecret)
+ * BackstageStack (this construct - RDS, Pod Identity, Helm chart + ExternalSecret)
  * </pre>
  */
 @Getter
 public class BackstageNestedStack extends NestedStack {
   private final RdsConstruct database;
-  private final IRole serviceAccountRole;
+  private final PodIdentityConstruct podIdentity;
   private final ICertificate certificate;
   private final DockerImageConstruct dockerImage;
   private final HelmChart backstageChart;
@@ -62,7 +63,7 @@ public class BackstageNestedStack extends NestedStack {
    * @param cluster
    *          the EKS cluster to deploy to
    * @param setup
-   *          pre-created resources
+   *          pre-created resources (database, certificate)
    * @param props
    *          nested stack properties
    */
@@ -76,10 +77,13 @@ public class BackstageNestedStack extends NestedStack {
     super(scope, "backstage", props);
 
     var backstage = TemplateUtils.parseAs(scope, conf.eks().addons(), AddonsConf.class).backstage();
+    var backstageSetup = TemplateUtils.parseAs(scope, backstage.setup(), BackstageSetup.class);
 
     this.database = setup.backstage().database();
     this.certificate = setup.certificate().certificate();
-    this.serviceAccountRole = setup.backstage().serviceAccountRole();
+
+    this.podIdentity = new PodIdentityConstruct(this, common, backstageSetup.podIdentity(), cluster);
+
     this.dockerImage = new DockerImageConstruct(this, common, backstage.dockerImage());
 
     var githubOAuthSecret = (String) this.getNode().getContext("deployment:github:oauth:backstage");

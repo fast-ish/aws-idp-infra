@@ -1,10 +1,9 @@
 # Velero Helm values for backup and disaster recovery
 # https://github.com/vmware-tanzu/helm-charts/tree/main/charts/velero
 
-# Use existing service account created by CDK with IRSA
 serviceAccount:
   server:
-    create: false
+    create: true
     name: velero
 
 # Velero configuration

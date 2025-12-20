@@ -1,5 +1,6 @@
 package fasti.sh.idp.stack;
 
+import fasti.sh.execute.aws.eks.PodIdentityConstruct;
 import fasti.sh.execute.util.TemplateUtils;
 import fasti.sh.idp.model.IdpReleaseConf;
 import fasti.sh.model.aws.eks.addon.AddonsConf;
@@ -31,6 +32,8 @@ import software.constructs.Construct;
 @Slf4j
 @Getter
 public class ArgoRolloutsNestedStack extends NestedStack {
+  private final PodIdentityConstruct controllerPodIdentity;
+  private final PodIdentityConstruct dashboardPodIdentity;
   private final HelmChart chart;
   private final KubernetesManifest ingress;
 
@@ -46,7 +49,9 @@ public class ArgoRolloutsNestedStack extends NestedStack {
    * @param cluster
    *          the EKS cluster to deploy to
    * @param setup
-   *          IDP setup (provides certificate and argoRollouts setup)
+   *          IDP setup (provides certificate)
+   * @param argocd
+   *          ArgoCD stack (provides SSO client secret)
    * @param props
    *          nested stack properties
    */
@@ -56,6 +61,7 @@ public class ArgoRolloutsNestedStack extends NestedStack {
     IdpReleaseConf conf,
     Cluster cluster,
     IdpSetupNestedStack setup,
+    ArgoCdNestedStack argocd,
     NestedStackProps props) {
     super(scope, "argorollouts", props);
 
@@ -63,11 +69,15 @@ public class ArgoRolloutsNestedStack extends NestedStack {
 
     var argoRollouts = TemplateUtils.parseAs(scope, conf.eks().addons(), AddonsConf.class).argoRollouts();
 
+    this.controllerPodIdentity = new PodIdentityConstruct(this, common, argoRollouts.controllerPodIdentity(), cluster);
+    this.dashboardPodIdentity = new PodIdentityConstruct(this, common, argoRollouts.dashboardPodIdentity(), cluster);
+
     var domain = (String) this.getNode().tryGetContext("deployment:domain");
 
     Map<String, Object> templateMappings = new HashMap<>();
     templateMappings.put("certificate.arn", setup.certificate().certificate().getCertificateArn());
     templateMappings.put("domain", domain);
+    templateMappings.put("argoRollouts.ssoClientSecret", argocd.argoRolloutsSsoClientSecret());
 
     var values = TemplateUtils.parseAsMap(scope, argoRollouts.chart().values(), templateMappings);
 
@@ -77,7 +87,7 @@ public class ArgoRolloutsNestedStack extends NestedStack {
       .wait(true)
       .timeout(Duration.minutes(15))
       .skipCrds(false)
-      .createNamespace(false)
+      .createNamespace(true)
       .chart(argoRollouts.chart().name())
       .namespace(argoRollouts.chart().namespace())
       .repository(argoRollouts.chart().repository())
