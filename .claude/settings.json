@@ -1,12 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(*)",
-      "FileEdit(*)",
-      "FileView(*)",
-      "Git(*)",
-      "Read(*)",
-      "Search(*)"
+      "Bash",
+      "FileEdit",
+      "FileView",
+      "Git",
+      "Read",
+      "Search"
     ]
   },
   "dangerouslySkipPermissions": true
