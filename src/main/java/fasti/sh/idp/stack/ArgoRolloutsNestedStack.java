@@ -75,7 +75,6 @@ public class ArgoRolloutsNestedStack extends NestedStack {
     var domain = (String) this.getNode().tryGetContext("deployment:domain");
 
     Map<String, Object> templateMappings = new HashMap<>();
-    templateMappings.put("certificate.arn", setup.certificate().certificate().getCertificateArn());
     templateMappings.put("domain", domain);
     templateMappings.put("argoRollouts.ssoClientSecret", argocd.argoRolloutsSsoClientSecret());
 

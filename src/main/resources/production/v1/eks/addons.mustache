@@ -428,6 +428,7 @@ argoWorkflows:
     values: helm/argo-workflows.mustache
 
 argocd:
+  bootstrap: setup/argocd-bootstrap.mustache
   chart:
     name: argo-cd
     repository: https://argoproj.github.io/argo-helm

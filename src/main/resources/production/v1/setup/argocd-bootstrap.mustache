@@ -1,0 +1,83 @@
+- apiVersion: argoproj.io/v1alpha1
+  kind: AppProject
+  metadata:
+    name: platform
+    namespace: argocd
+    labels:
+      app.kubernetes.io/part-of: argocd
+  spec:
+    description: Platform team AppProject for managing core IDP components
+    sourceRepos:
+      - 'https://github.com/fast-ish/*'
+      - '*'
+    destinations:
+      - namespace: '*'
+        server: https://kubernetes.default.svc
+    clusterResourceWhitelist:
+      - group: '*'
+        kind: '*'
+    namespaceResourceWhitelist:
+      - group: '*'
+        kind: '*'
+- apiVersion: argoproj.io/v1alpha1
+  kind: Application
+  metadata:
+    name: platform-applicationsets
+    namespace: argocd
+    labels:
+      app.kubernetes.io/part-of: argocd
+    finalizers:
+      - resources-finalizer.argocd.argoproj.io
+  spec:
+    project: platform
+    source:
+      repoURL: https://github.com/fast-ish/aws-idp-gitops.git
+      targetRevision: HEAD
+      path: platform/argocd/applicationsets
+      directory:
+        recurse: false
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: argocd
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=false
+      retry:
+        limit: 5
+        backoff:
+          duration: 5s
+          factor: 2
+          maxDuration: 3m
+- apiVersion: argoproj.io/v1alpha1
+  kind: Application
+  metadata:
+    name: platform-post-deploy
+    namespace: argocd
+    labels:
+      app.kubernetes.io/part-of: argocd
+    finalizers:
+      - resources-finalizer.argocd.argoproj.io
+  spec:
+    project: platform
+    source:
+      repoURL: https://github.com/fast-ish/aws-idp-gitops.git
+      targetRevision: HEAD
+      path: platform/post-deploy
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: argocd
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true
+      retry:
+        limit: 5
+        backoff:
+          duration: 5s
+          factor: 2
+          maxDuration: 3m

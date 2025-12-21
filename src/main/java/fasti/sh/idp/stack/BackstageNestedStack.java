@@ -100,8 +100,6 @@ public class BackstageNestedStack extends NestedStack {
         this.database.secretConstruct().secret().getSecretName(),
         "auth.github.awsSecretName",
         githubOAuthSecret,
-        "certificate.arn",
-        this.certificate.getCertificateArn(),
         "image.uri",
         this.dockerImage.imageUri());
 

@@ -5,7 +5,9 @@ import fasti.sh.execute.util.TemplateUtils;
 import fasti.sh.idp.model.IdpReleaseConf;
 import fasti.sh.model.aws.eks.addon.AddonsConf;
 import fasti.sh.model.main.Common;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +16,7 @@ import software.amazon.awscdk.NestedStack;
 import software.amazon.awscdk.NestedStackProps;
 import software.amazon.awscdk.services.eks.Cluster;
 import software.amazon.awscdk.services.eks.HelmChart;
+import software.amazon.awscdk.services.eks.KubernetesManifest;
 import software.constructs.Construct;
 
 /**
@@ -28,6 +31,7 @@ import software.constructs.Construct;
 public class ArgoCdNestedStack extends NestedStack {
   private final PodIdentityConstruct podIdentity;
   private final HelmChart chart;
+  private final KubernetesManifest bootstrap;
   private final String argoWorkflowsSsoClientSecret;
   private final String argoRolloutsSsoClientSecret;
 
@@ -71,7 +75,6 @@ public class ArgoCdNestedStack extends NestedStack {
     var templateMappings = new HashMap<String, Object>();
     templateMappings.put("repoServer.role.arn", this.podIdentity.roleConstruct().role().getRoleArn());
     templateMappings.put("domain", common.domain());
-    templateMappings.put("certificate.arn", setup.certificate().certificate().getCertificateArn());
     templateMappings.put("github.org", githubOrg);
     templateMappings.put("github.oauthSecretName", githubOAuthSecret);
     templateMappings.put("argoWorkflows.ssoClientSecret", this.argoWorkflowsSsoClientSecret);
@@ -92,5 +95,15 @@ public class ArgoCdNestedStack extends NestedStack {
       .version(argocd.chart().version())
       .values(values)
       .build();
+
+    var bootstrapManifests = TemplateUtils.parseAsList(scope, argocd.bootstrap(), new HashMap<>());
+    this.bootstrap = KubernetesManifest.Builder
+      .create(this, "bootstrap")
+      .cluster(cluster)
+      .manifest(bootstrapManifests)
+      .overwrite(true)
+      .build();
+
+    this.bootstrap.getNode().addDependency(this.chart);
   }
 }

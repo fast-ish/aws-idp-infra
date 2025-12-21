@@ -38,13 +38,15 @@ server:
     annotations:
       alb.ingress.kubernetes.io/scheme: internet-facing
       alb.ingress.kubernetes.io/target-type: ip
-      alb.ingress.kubernetes.io/certificate-arn: "{{certificate.arn}}"
       alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
       alb.ingress.kubernetes.io/ssl-redirect: "443"
+      alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
       alb.ingress.kubernetes.io/healthcheck-path: /
       alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
       alb.ingress.kubernetes.io/backend-protocol: HTTP
       alb.ingress.kubernetes.io/group.name: argo
+      external-dns.alpha.kubernetes.io/hostname: workflows.{{domain}}
+      external-dns.alpha.kubernetes.io/ttl: "300"
     hosts:
       - workflows.{{domain}}
     paths:

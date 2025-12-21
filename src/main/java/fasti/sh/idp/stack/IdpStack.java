@@ -130,18 +130,6 @@ public class IdpStack extends Stack {
         .description(describe(conf.common(), "idp::argocd"))
         .build());
 
-    this.argoWorkflows = new ArgoWorkflowsNestedStack(
-      this,
-      conf.common(),
-      conf,
-      this.eks.cluster(),
-      this.setup,
-      this.argocd,
-      NestedStackProps
-        .builder()
-        .description(describe(conf.common(), "idp::argo-workflows"))
-        .build());
-
     this.argoEvents = new ArgoEventsNestedStack(
       this,
       conf.common(),
@@ -165,14 +153,26 @@ public class IdpStack extends Stack {
         .description(describe(conf.common(), "idp::argo-rollouts"))
         .build());
 
+    this.argoWorkflows = new ArgoWorkflowsNestedStack(
+      this,
+      conf.common(),
+      conf,
+      this.eks.cluster(),
+      this.setup,
+      this.argocd,
+      NestedStackProps
+        .builder()
+        .description(describe(conf.common(), "idp::argo-workflows"))
+        .build());
+
     this.eks().addDependency(this.network());
     this.coreAddons().addDependency(this.eks());
     this.observabilityAddons().addDependency(this.coreAddons());
     this.setup().addDependency(this.coreAddons());
     this.backstage().addDependency(this.setup());
-    this.argocd().addDependency(this.setup());
-    this.argoWorkflows().addDependency(this.argocd());
-    this.argoEvents().addDependency(this.argoWorkflows());
+    this.argocd().addDependency(this.backstage());
+    this.argoEvents().addDependency(this.argocd());
     this.argoRollouts().addDependency(this.argoEvents());
+    this.argoWorkflows().addDependency(this.argoRollouts());
   }
 }

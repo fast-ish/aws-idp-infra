@@ -161,13 +161,17 @@ server:
     annotations:
       alb.ingress.kubernetes.io/scheme: internet-facing
       alb.ingress.kubernetes.io/target-type: ip
-      alb.ingress.kubernetes.io/certificate-arn: "{{certificate.arn}}"
       alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
       alb.ingress.kubernetes.io/ssl-redirect: "443"
+      alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
       alb.ingress.kubernetes.io/healthcheck-path: /healthz
       alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
       alb.ingress.kubernetes.io/backend-protocol: HTTP
       alb.ingress.kubernetes.io/group.name: argo
+      external-dns.alpha.kubernetes.io/hostname: argocd.{{domain}}
+      external-dns.alpha.kubernetes.io/ttl: "300"
+    hosts:
+      - argocd.{{domain}}
 
   metrics:
     enabled: true
@@ -361,56 +365,3 @@ extraObjects:
     stringData:
       client-id: argo-rollouts
       client-secret: "{{argoRollouts.ssoClientSecret}}"
-  - apiVersion: argoproj.io/v1alpha1
-    kind: AppProject
-    metadata:
-      name: platform
-      namespace: argocd
-      labels:
-        app.kubernetes.io/part-of: argocd
-    spec:
-      description: Platform team AppProject for managing core IDP components
-      sourceRepos:
-        - 'https://github.com/fast-ish/*'
-        - '*'
-      destinations:
-        - namespace: '*'
-          server: https://kubernetes.default.svc
-      clusterResourceWhitelist:
-        - group: '*'
-          kind: '*'
-      namespaceResourceWhitelist:
-        - group: '*'
-          kind: '*'
-  - apiVersion: argoproj.io/v1alpha1
-    kind: Application
-    metadata:
-      name: argocd-bootstrap
-      namespace: argocd
-      labels:
-        app.kubernetes.io/part-of: argocd
-      finalizers:
-        - resources-finalizer.argocd.argoproj.io
-    spec:
-      project: platform
-      source:
-        repoURL: https://github.com/fast-ish/aws-idp-gitops.git
-        targetRevision: HEAD
-        path: platform/argocd/applicationsets
-        directory:
-          recurse: false
-      destination:
-        server: https://kubernetes.default.svc
-        namespace: argocd
-      syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
-        syncOptions:
-          - CreateNamespace=false
-        retry:
-          limit: 5
-          backoff:
-            duration: 5s
-            factor: 2
-            maxDuration: 3m

@@ -6,9 +6,9 @@ metadata:
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/certificate-arn: "{{certificate.arn}}"
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
     alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
     alb.ingress.kubernetes.io/healthcheck-path: /
     alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
     alb.ingress.kubernetes.io/backend-protocol: HTTP
@@ -19,8 +19,13 @@ metadata:
     alb.ingress.kubernetes.io/auth-session-cookie: AWSELBAuthSessionCookie
     alb.ingress.kubernetes.io/auth-session-timeout: "86400"
     alb.ingress.kubernetes.io/auth-on-unauthenticated-request: authenticate
+    external-dns.alpha.kubernetes.io/hostname: rollouts.{{domain}}
+    external-dns.alpha.kubernetes.io/ttl: "300"
 spec:
   ingressClassName: alb
+  tls:
+    - hosts:
+        - rollouts.{{domain}}
   rules:
     - host: rollouts.{{domain}}
       http:
