@@ -1,0 +1,136 @@
+name: CDK Template Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate-templates:
+    name: Validate CDK Templates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'corretto'
+          cache: maven
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install cfn-lint
+        run: |
+          pip install cfn-lint
+          cfn-lint --version
+
+      - name: Build cdk-common dependency
+        run: |
+          git clone https://github.com/fast-ish/cdk-common.git /tmp/cdk-common
+          cd /tmp/cdk-common
+          mvn clean install -DskipTests -B
+
+      - name: Compile project
+        run: mvn compile -B
+
+      - name: Run unit tests
+        run: mvn test -B
+        continue-on-error: true
+
+      - name: Synthesize CDK templates
+        run: |
+          echo "## 📝 CDK Template Synthesis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if mvn exec:java -Dexec.mainClass="fasti.sh.execute.Build" -q; then
+            echo "✅ CDK synthesis completed successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ CDK synthesis failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: Validate CloudFormation templates
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔍 CloudFormation Template Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          TEMPLATE_FILES=$(find cdk.out -name "*.template.json" -type f)
+          VALIDATION_FAILED=0
+          TEMPLATE_COUNT=0
+
+          if [ -z "${TEMPLATE_FILES}" ]; then
+            echo "⚠️ No CloudFormation templates found" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          echo "| Template | Status | Issues |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          for template in ${TEMPLATE_FILES}; do
+            TEMPLATE_COUNT=$((TEMPLATE_COUNT + 1))
+            template_name=$(basename "${template}")
+
+            # Run cfn-lint and capture output
+            if output=$(cfn-lint "${template}" --format parseable 2>&1); then
+              echo "| ${template_name} | ✅ Pass | None |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| ${template_name} | ❌ Fail | See details below |" >> $GITHUB_STEP_SUMMARY
+              echo "<details><summary>Errors for ${template_name}</summary>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+              echo "${output}" >> $GITHUB_STEP_SUMMARY
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+              echo "</details>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              VALIDATION_FAILED=1
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Summary:** ${TEMPLATE_COUNT} template(s) validated" >> $GITHUB_STEP_SUMMARY
+
+          if [ ${VALIDATION_FAILED} -eq 1 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Template validation failed. Please fix the issues above." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All templates passed validation" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload CDK templates
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdk-templates
+          path: cdk.out/*.template.json
+          retention-days: 7
+
+      - name: Comment on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync(process.env.GITHUB_STEP_SUMMARY, 'utf8');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: summary
+            });
